@@ -22,6 +22,7 @@ export const movementEnum = pgEnum("movement_type", [
 ]);
 export const directionEnum = pgEnum("movement_direction", ["IN", "OUT", "RESERVE", "RELEASE"]);
 export const locationEnum = pgEnum("inventory_location", ["RAW_COOLER", "FINISHED_COOLER", "RESERVED", "SOLD", "WASTE"]);
+export const ticketStatusEnum = pgEnum("ticket_status", ["OPEN", "AWAITING_PAYMENT", "PAID", "CANCELLED", "RETURNED", "PARTIALLY_RETURNED"]);
 
 const money = (name: string) => numeric(name, { precision: 14, scale: 2 });
 const weight = (name: string) => numeric(name, { precision: 14, scale: 3 });
@@ -162,6 +163,39 @@ export const stockLedgerEntries = pgTable("stock_ledger_entries", {
   occurredAt: timestamp("occurred_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [index("ledger_product_date_idx").on(t.productId, t.occurredAt), index("ledger_batch_idx").on(t.batchId)]);
 
+export const stockCounts = pgTable("stock_counts", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  number: text("number").notNull().unique(),
+  status: text("status").default("COMPLETED").notNull(),
+  countedBy: uuid("counted_by").notNull().references(() => users.id),
+  notes: text("notes"),
+  completedAt: timestamp("completed_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const stockCountItems = pgTable("stock_count_items", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  stockCountId: uuid("stock_count_id").notNull().references(() => stockCounts.id),
+  productId: uuid("product_id").notNull().references(() => products.id),
+  expectedKg: weight("expected_kg").notNull(),
+  countedKg: weight("counted_kg").notNull(),
+  varianceKg: weight("variance_kg").notNull(),
+  varianceValue: money("variance_value").notNull(),
+  reason: text("reason").notNull(),
+}, (t) => [uniqueIndex("stock_count_product_unique").on(t.stockCountId, t.productId)]);
+
+export const wasteRecords = pgTable("waste_records", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  number: text("number").notNull().unique(),
+  productId: uuid("product_id").notNull().references(() => products.id),
+  batchId: uuid("batch_id").references(() => deliveryBatches.id),
+  weightKg: weight("weight_kg").notNull(),
+  costValue: money("cost_value").notNull(),
+  reason: text("reason").notNull(),
+  notes: text("notes"),
+  recordedBy: uuid("recorded_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [index("waste_product_date_idx").on(t.productId, t.createdAt)]);
+
 export const customers = pgTable("customers", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),
@@ -171,10 +205,13 @@ export const customers = pgTable("customers", {
 export const butcherTickets = pgTable("butcher_tickets", {
   id: uuid("id").defaultRandom().primaryKey(),
   number: text("number").notNull().unique(),
-  status: text("status").notNull(),
+  status: ticketStatusEnum("status").default("AWAITING_PAYMENT").notNull(),
   butcherId: uuid("butcher_id").notNull().references(() => users.id),
   customerId: uuid("customer_id").references(() => customers.id),
   total: money("total").notNull(),
+  totalWeightKg: weight("total_weight_kg").default("0").notNull(),
+  cancellationReason: text("cancellation_reason"),
+  cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
