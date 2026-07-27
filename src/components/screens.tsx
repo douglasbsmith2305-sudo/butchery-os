@@ -4,8 +4,12 @@ import {
   ArrowDownRight, ArrowRight, ArrowUpRight, Check, ChevronRight, CircleAlert,
   Clock3, PackageOpen, Plus, Scale, Scissors, ShieldCheck, Sparkles, Truck,
 } from "lucide-react";
+import Link from "next/link";
 import { useMemo, useState } from "react";
-import { batches, inventory, profile, recentLedger } from "@/lib/demo-data";
+import { NewTicketScreen, OpenTicketsScreen, RecentTicketsScreen } from "@/components/butcher-workflows";
+import { StockCountScreen, WasteScreen } from "@/components/cooler-workflows";
+import { useOperations } from "@/components/operations-store";
+import { batches, profile, recentLedger } from "@/lib/demo-data";
 import { calculateProjectedYields, reconcileProcessing } from "@/lib/inventory";
 import { kg, zar } from "@/lib/utils";
 
@@ -35,19 +39,26 @@ function Metric({ name, value, detail, trend, tone = "neutral" }: { name: string
 }
 
 function Dashboard() {
+  const { inventory, tickets, waste } = useOperations();
+  const physicalKg = inventory.reduce((sum, item) => sum + item.physical, 0);
+  const reservedKg = inventory.reduce((sum, item) => sum + item.reserved, 0);
+  const inventoryValue = inventory.reduce((sum, item) => sum + item.physical * item.cost, 0);
+  const openTickets = tickets.filter((ticket) => ticket.status === "Open" || ticket.status === "Awaiting payment").length;
+  const today = new Date().toISOString().slice(0, 10);
+  const wasteToday = waste.filter((item) => item.createdAt.slice(0, 10) === today).reduce((sum, item) => sum + item.weightKg, 0);
   return <>
     <Title eyebrow="Cooler control" title="Good morning, Naledi." copy="Every kilogram is accounted for. Here is your operating position for Monday, 27 July." action={<button className={button}><Plus size={16}/> Receive delivery</button>}/>
     <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <Metric name="Physical stock" value="1,978.6 kg" detail="12 finished products" trend="+4.2%"/>
-      <Metric name="Available stock" value="1,894.0 kg" detail="84.6 kg reserved" tone="green"/>
-      <Metric name="Inventory value" value="R 174,842" detail="Weighted average cost"/>
+      <Metric name="Physical stock" value={kg(physicalKg)} detail={`${inventory.length} finished products`} trend="+4.2%"/>
+      <Metric name="Available stock" value={kg(physicalKg - reservedKg)} detail={`${reservedKg.toFixed(2)} kg reserved`} tone="green"/>
+      <Metric name="Inventory value" value={zar.format(inventoryValue)} detail="Weighted average cost"/>
       <Metric name="Unprocessed beef" value="896.7 kg" detail="2 active batches" tone="amber"/>
     </div>
     <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <Metric name="Received today" value="712.2 kg" detail="1 supplier delivery" trend="+R 66,382"/>
       <Metric name="Processed today" value="720.0 kg" detail="717.8 kg accounted" tone="green"/>
       <Metric name="Processing variance" value="2.2 kg" detail="0.31% moisture loss" tone="amber"/>
-      <Metric name="Waste today" value="39.6 kg" detail="5.5% of input" tone="neutral"/>
+      <Metric name="Waste today" value={kg(wasteToday)} detail={`${openTickets} open butcher ticket${openTickets === 1 ? "" : "s"}`} tone="neutral"/>
     </div>
     <div className="grid gap-4 xl:grid-cols-[1.45fr_.8fr]">
       <div className={`${card} overflow-hidden`}>
@@ -127,7 +138,8 @@ function Processing() {
 }
 
 function Inventory() {
-  return <><Title eyebrow="Cooler / stock" title="Finished inventory" copy="Physical, reserved and available kilograms calculated from the immutable stock ledger." action={<div className="flex gap-2"><Badge tone="green">Live ledger</Badge><button className={button}><Scale size={16}/> Start stock count</button></div>}/>
+  const { inventory } = useOperations();
+  return <><Title eyebrow="Cooler / stock" title="Finished inventory" copy="Physical, reserved and available kilograms calculated from the immutable stock ledger." action={<div className="flex gap-2"><Badge tone="green">Live ledger</Badge><Link className={button} href="/cooler/stock-count"><Scale size={16}/> Start stock count</Link></div>}/>
     <div className={`${card} overflow-hidden`}><div className="scrollbar overflow-x-auto"><table className="w-full min-w-[900px] text-left"><thead><tr className="border-b border-[#272e34] text-[10px] uppercase tracking-[.12em] text-[#69747d]">{["Product","Physical kg","Reserved kg","Available kg","Avg cost/kg","Potential retail","Last movement","Status"].map((x,i)=><th key={x} className={`px-5 py-3 font-medium ${i>0&&i<6?"text-right":""}`}>{x}</th>)}</tr></thead><tbody>{inventory.map(x=><tr key={x.product} className="border-b border-[#20262b] text-xs last:border-0 hover:bg-[#151a1e]"><td className="px-5 py-4 font-semibold">{x.product}</td><td className="px-5 py-4 text-right font-mono">{x.physical.toFixed(1)}</td><td className="px-5 py-4 text-right font-mono text-[#e2ad53]">{x.reserved.toFixed(1)}</td><td className="px-5 py-4 text-right font-mono font-semibold text-[#68cc98]">{(x.physical-x.reserved).toFixed(1)}</td><td className="px-5 py-4 text-right font-mono text-[#89949d]">{zar.format(x.cost)}</td><td className="px-5 py-4 text-right font-mono">{zar.format(x.physical*x.price)}</td><td className="px-5 py-4 text-[#7b868f]">{x.movement}</td><td className="px-5 py-4"><Badge tone={x.product==="Fat/Waste"?"gray":"green"}>{x.product==="Fat/Waste"?"Non-saleable":"Healthy"}</Badge></td></tr>)}</tbody></table></div></div></>;
 }
 
@@ -153,5 +165,10 @@ export function ScreenRouter({ path }: { path: string }) {
   if (path === "/cooler/processing") return <Processing/>;
   if (path === "/cooler/inventory") return <Inventory/>;
   if (path === "/cooler/batches") return <Batches/>;
+  if (path === "/cooler/stock-count") return <StockCountScreen/>;
+  if (path === "/cooler/waste") return <WasteScreen/>;
+  if (path === "/butcher/new") return <NewTicketScreen/>;
+  if (path === "/butcher/open") return <OpenTicketsScreen/>;
+  if (path === "/butcher/recent") return <RecentTicketsScreen/>;
   return <Placeholder path={path}/>;
 }
