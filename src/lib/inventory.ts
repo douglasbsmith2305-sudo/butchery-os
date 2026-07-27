@@ -76,3 +76,23 @@ export function reverseSale(availableKg: number, soldKg: number, returnKg: numbe
   assertCanConsume(soldKg, returnKg);
   return { availableKg: round3(availableKg + returnKg), soldKg: round3(soldKg - returnKg) };
 }
+
+export function recordWaste(physicalKg: number, reservedKg: number, wasteKg: number) {
+  assertCanConsume(round3(physicalKg - reservedKg), wasteKg);
+  return {
+    physicalKg: round3(physicalKg - wasteKg),
+    reservedKg: round3(reservedKg),
+    availableKg: round3(physicalKg - reservedKg - wasteKg),
+  };
+}
+
+export function reconcileStockCount(expectedKg: number, countedKg: number) {
+  if (countedKg < 0) throw new Error("Counted stock cannot be negative");
+  const varianceKg = round3(countedKg - expectedKg);
+  return {
+    expectedKg: round3(expectedKg),
+    countedKg: round3(countedKg),
+    varianceKg,
+    direction: varianceKg > 0 ? "IN" as const : varianceKg < 0 ? "OUT" as const : "NONE" as const,
+  };
+}

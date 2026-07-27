@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   calculateProjectedYields, cancelReservation, completeSale, grossMargin,
-  reconcileProcessing, reserveStock, reverseSale, validateYieldProfile, weightedAverageCost,
+  reconcileProcessing, reconcileStockCount, recordWaste, reserveStock, reverseSale,
+  validateYieldProfile, weightedAverageCost,
 } from "./inventory";
 
 const lines = [{ productId: "rump", name: "Rump", percent: 40 }, { productId: "bone", name: "Bone", percent: 60 }];
@@ -37,5 +38,18 @@ describe("critical stock logic", () => {
   });
   it("calculates financial gross margin", () => {
     expect(grossMargin(150, 100)).toBe(33.33);
+  });
+  it("waste reduces physical and available stock without touching reservations", () => {
+    expect(recordWaste(25, 5, 2.5)).toEqual({ physicalKg: 22.5, reservedKg: 5, availableKg: 17.5 });
+  });
+  it("waste cannot consume customer-reserved stock", () => {
+    expect(() => recordWaste(10, 8, 2.1)).toThrow(/Insufficient/);
+  });
+  it("physical stock counts calculate signed ledger variances", () => {
+    expect(reconcileStockCount(45.3, 44.1)).toEqual({ expectedKg: 45.3, countedKg: 44.1, varianceKg: -1.2, direction: "OUT" });
+    expect(reconcileStockCount(45.3, 46)).toEqual({ expectedKg: 45.3, countedKg: 46, varianceKg: 0.7, direction: "IN" });
+  });
+  it("physical stock counts reject negative weights", () => {
+    expect(() => reconcileStockCount(4, -1)).toThrow(/negative/);
   });
 });
