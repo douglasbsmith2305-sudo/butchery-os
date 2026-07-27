@@ -1,6 +1,6 @@
 # Butchery OS
 
-Butchery OS is a kilogram-first operating system for retail butcheries. Phase 1 and Phase 2 implement the traceability foundation from supplier delivery through theoretical block testing, physical processing, finished Cooler inventory, and an immutable stock ledger.
+Butchery OS is a kilogram-first operating system for retail butcheries. The current application covers the traceability foundation from supplier delivery through processing and finished inventory, plus day-to-day Cooler controls and the Butcher ticket workflow.
 
 ## What is implemented
 
@@ -12,12 +12,17 @@ Butchery OS is a kilogram-first operating system for retail butcheries. Phase 1 
 - Reconciliation gate: inputs must equal outputs plus an explicit loss category
 - Batch-linked raw and finished inventory lots
 - Immutable ledger entries and audit logging
+- Guided physical stock counts with signed variances, mandatory reasons, and reserved-stock protection
+- Waste capture with cost impact, permanent history, and immediate available-stock updates
+- Butcher tickets with live product availability, scale-weight capture, snapshot pricing, and stock reservation
+- Open-ticket review and controlled cancellation that releases reserved kilograms
+- Searchable recent-ticket history with paid, awaiting-payment, and cancelled states
 - Weighted-average-ready inventory costing with retained batch provenance
 - Server-side RBAC foundation for ADMIN, MANAGER, WAREHOUSE, BUTCHER, and CASHIER
-- Schema scaffolding for butcher tickets, reservations, POS sales, and payments
+- Database schema for stock counts, waste records, butcher tickets, reservations, POS sales, and payments
 - Automated critical stock and financial calculation tests
 
-The live interface contains realistic seeded demo data. Database mutations activate when a PostgreSQL connection is configured.
+The live interface contains realistic seeded demo data. Cooler-control and Butcher workflow changes persist in the browser on the current device. The PostgreSQL schema and migrations are ready for shared multi-user persistence when a production database is connected.
 
 ## Stack
 
@@ -65,7 +70,7 @@ npm test
 npm run build
 ```
 
-The core test suite covers yield calculation and profile validation, processing reconciliation, negative-stock prevention, butcher reservation/cancellation, POS reservation-to-sale movement, sale reversal, weighted average cost, and gross margin.
+The core test suite covers yield calculation and profile validation, processing reconciliation, negative-stock prevention, physical-count variance, waste controls, butcher reservation/cancellation, POS reservation-to-sale movement, sale reversal, weighted average cost, and gross margin.
 
 ## Vercel deployment
 
@@ -88,4 +93,4 @@ Stock changes belong in `src/lib/services/stock.ts`, where receiving and process
 
 ## Phase roadmap
 
-Phase 3 adds the operational butcher-ticket and reservation screens. Phase 4 completes payment, sale, refund, and till workflows. Phase 5 activates profitability, supplier analytics, daily reconciliation, and variance management over the schema and ledger already established here.
+Cooler stock count, waste control, and the Butcher ticket lifecycle are active. The next agreed phase completes POS payment, sale, refund, and till workflows. Management profitability, supplier analytics, daily reconciliation, and variance reporting follow on the shared schema and ledger.
