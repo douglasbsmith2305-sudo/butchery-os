@@ -12,6 +12,14 @@ import { useOperations } from "@/components/operations-store";
 import { PosCheckoutScreen } from "@/components/pos-checkout";
 import { PosSalesScreen } from "@/components/pos-sales";
 import { PosTillScreen } from "@/components/pos-till";
+import {
+  BatchProfitabilityScreen,
+  ManagementDashboard,
+  ProductProfitabilityScreen,
+  ReconciliationScreen,
+  SupplierPerformanceScreen,
+  VariancesScreen,
+} from "@/components/management-screens";
 import { batches, profile, recentLedger } from "@/lib/demo-data";
 import { calculateProjectedYields, reconcileProcessing } from "@/lib/inventory";
 import { kg, zar } from "@/lib/utils";
@@ -176,5 +184,11 @@ export function ScreenRouter({ path }: { path: string }) {
   if (path === "/pos/checkout") return <PosCheckoutScreen/>;
   if (path === "/pos/sales") return <PosSalesScreen/>;
   if (path === "/pos/till") return <PosTillScreen/>;
+  if (path === "/management") return <ManagementDashboard/>;
+  if (path === "/management/products") return <ProductProfitabilityScreen/>;
+  if (path === "/management/batches") return <BatchProfitabilityScreen/>;
+  if (path === "/management/suppliers") return <SupplierPerformanceScreen/>;
+  if (path === "/management/variances") return <VariancesScreen/>;
+  if (path === "/management/reconciliation") return <ReconciliationScreen/>;
   return <Placeholder path={path}/>;
 }

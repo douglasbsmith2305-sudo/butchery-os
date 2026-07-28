@@ -149,6 +149,36 @@ export type CompleteSaleInput = {
   payments: { method: PaymentMethod; amount: number }[];
 };
 
+export type ManagementReview = {
+  issueId: string;
+  note: string;
+  reviewedBy: string;
+  reviewedAt: string;
+};
+
+export type ReconciliationSnapshot = {
+  range: string;
+  openingKg: number;
+  receivedKg: number;
+  returnsKg: number;
+  soldKg: number;
+  wasteKg: number;
+  adjustmentsKg: number;
+  expectedClosingKg: number;
+  physicalClosingKg: number;
+  varianceKg: number;
+  varianceValue: number;
+  note: string;
+};
+
+export type ReconciliationRecord = ReconciliationSnapshot & {
+  id: string;
+  number: string;
+  status: "Completed";
+  completedBy: string;
+  createdAt: string;
+};
+
 export type LedgerMovement = {
   id: string;
   product: string;
@@ -168,6 +198,8 @@ type OperationsState = {
   retailProducts: RetailProduct[];
   sales: SaleRecord[];
   tillSessions: TillSession[];
+  managementReviews: ManagementReview[];
+  reconciliations: ReconciliationRecord[];
 };
 
 type OperationsContextValue = OperationsState & {
@@ -180,11 +212,13 @@ type OperationsContextValue = OperationsState & {
   updateScalePlu(productId: string, plu: string): void;
   openTill(openingFloat: number): TillSession;
   closeTill(closingCount: number): TillSession;
+  reviewManagementIssue(issueId: string, note: string): void;
+  completeReconciliation(input: ReconciliationSnapshot): ReconciliationRecord;
   resetDemo(): void;
 };
 
-const STORAGE_KEY = "butchery-os-operations-v3";
-const LEGACY_STORAGE_KEY = "butchery-os-operations-v2";
+const STORAGE_KEY = "butchery-os-operations-v4";
+const LEGACY_STORAGE_KEYS = ["butchery-os-operations-v3", "butchery-os-operations-v2"];
 const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 const round3 = (value: number) => Math.round((value + Number.EPSILON) * 1000) / 1000;
 
@@ -321,6 +355,8 @@ function createSeedState(): OperationsState {
         openedAt: "2026-07-28T06:00:00.000Z",
       },
     ],
+    managementReviews: [],
+    reconciliations: [],
   };
 }
 
@@ -343,6 +379,8 @@ function upgradeState(saved: Partial<OperationsState>): OperationsState {
     retailProducts: saved.retailProducts ?? seed.retailProducts,
     sales: saved.sales ?? seed.sales,
     tillSessions: saved.tillSessions ?? seed.tillSessions,
+    managementReviews: saved.managementReviews ?? seed.managementReviews,
+    reconciliations: saved.reconciliations ?? seed.reconciliations,
   };
 }
 
@@ -356,7 +394,8 @@ export function OperationsProvider({ children }: { children: React.ReactNode }) 
     let cancelled = false;
     queueMicrotask(() => {
       if (cancelled) return;
-      const saved = window.localStorage.getItem(STORAGE_KEY) ?? window.localStorage.getItem(LEGACY_STORAGE_KEY);
+      const saved = window.localStorage.getItem(STORAGE_KEY)
+        ?? LEGACY_STORAGE_KEYS.map((key) => window.localStorage.getItem(key)).find(Boolean);
       if (saved) {
         try {
           setState(upgradeState(JSON.parse(saved) as Partial<OperationsState>));
@@ -736,6 +775,34 @@ export function OperationsProvider({ children }: { children: React.ReactNode }) 
       const tillSessions = state.tillSessions.map((session) => session.id === till.id ? closed : session);
       setState({ ...state, tillSessions });
       return closed;
+    },
+    reviewManagementIssue(issueId, note) {
+      if (!note.trim()) throw new Error("Add a management review note");
+      const review: ManagementReview = {
+        issueId,
+        note: note.trim(),
+        reviewedBy: "Lerato Dlamini",
+        reviewedAt: new Date().toISOString(),
+      };
+      const managementReviews = [
+        review,
+        ...state.managementReviews.filter((item) => item.issueId !== issueId),
+      ];
+      setState({ ...state, managementReviews });
+    },
+    completeReconciliation(input) {
+      if (!input.note.trim()) throw new Error("Add a reconciliation note");
+      const highest = Math.max(7000, ...state.reconciliations.map((record) => Number(record.number.replace("REC-", "")) || 0));
+      const created: ReconciliationRecord = {
+        ...input,
+        id: crypto.randomUUID(),
+        number: `REC-${highest + 1}`,
+        status: "Completed",
+        completedBy: "Lerato Dlamini",
+        createdAt: new Date().toISOString(),
+      };
+      setState({ ...state, reconciliations: [created, ...state.reconciliations] });
+      return created;
     },
     resetDemo() {
       setState(createSeedState());
