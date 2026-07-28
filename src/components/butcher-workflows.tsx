@@ -3,8 +3,9 @@
 import { useMemo, useState } from "react";
 import {
   Check, ChevronDown, ChevronUp, CircleX, Clock3, PackageCheck,
-  Plus, Scale, Search, ShoppingBasket, Trash2, X,
+  CreditCard, Plus, Printer, Scale, Search, ShoppingBasket, Trash2, X,
 } from "lucide-react";
+import Link from "next/link";
 import { type ButcherTicket, type TicketStatus, useOperations } from "@/components/operations-store";
 import { kg, zar } from "@/lib/utils";
 
@@ -102,7 +103,7 @@ export function NewTicketScreen() {
       {message && (
         <div className={`mb-4 flex items-start gap-3 rounded-lg border p-4 text-sm ${message.type === "success" ? "border-[#28533e] bg-[#10291f] text-[#70d09d]" : "border-[#613037] bg-[#2f1519] text-[#e87980]"}`}>
           {message.type === "success" ? <Check className="mt-0.5 shrink-0" size={17} /> : <CircleX className="mt-0.5 shrink-0" size={17} />}
-          <div><p>{message.text}</p>{message.ticket && <p className="mt-1 font-mono text-xs text-[#8dbfa4]">{message.ticket.items.length} item{message.ticket.items.length === 1 ? "" : "s"} · {zar.format(message.ticket.total)}</p>}</div>
+          <div className="flex-1"><p>{message.text}</p>{message.ticket && <><p className="mt-1 font-mono text-xs text-[#8dbfa4]">{message.ticket.items.length} item{message.ticket.items.length === 1 ? "" : "s"} · {zar.format(message.ticket.total)}</p><div className="mt-3 flex flex-wrap gap-2"><Link className={secondaryButton} href="/pos/checkout"><CreditCard size={14} /> Take payment at POS</Link><button className={secondaryButton} onClick={() => window.print()}><Printer size={14} /> Print ticket</button></div></>}</div>
         </div>
       )}
 
@@ -218,7 +219,7 @@ export function OpenTicketsScreen() {
                         <button className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#7b2e35] px-4 text-xs font-semibold text-white hover:bg-[#923942] disabled:opacity-40" disabled={!reason} onClick={() => confirmCancellation(ticket)}><CircleX size={15} /> Confirm cancellation</button>
                         <button className={secondaryButton} onClick={() => { setCancellingId(null); setReason(""); }}><X size={14} /> Keep ticket</button>
                       </div>
-                    ) : <button className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-[#5a2d33] bg-[#251316] px-4 text-xs font-medium text-[#e27a81] hover:bg-[#30181c]" onClick={() => { setCancellingId(ticket.id); setReason(""); }}><CircleX size={15} /> Cancel & release stock</button>}
+                    ) : <div className="flex flex-wrap gap-2"><Link className={secondaryButton} href="/pos/checkout"><CreditCard size={14} /> Send to POS</Link><button className={secondaryButton} onClick={() => window.print()}><Printer size={14} /> Print</button><button className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-[#5a2d33] bg-[#251316] px-4 text-xs font-medium text-[#e27a81] hover:bg-[#30181c]" onClick={() => { setCancellingId(ticket.id); setReason(""); }}><CircleX size={15} /> Cancel & release stock</button></div>}
                   </div>
                 </div>
               )}
