@@ -1,6 +1,6 @@
 # Butchery OS
 
-Butchery OS is a kilogram-first operating system for retail butcheries. The current application covers the traceability foundation from supplier delivery through processing and finished inventory, plus day-to-day Cooler controls and the Butcher ticket workflow.
+Butchery OS is a kilogram-first operating system for retail butcheries. The current application covers the traceability foundation from supplier delivery through processing and finished inventory, day-to-day Cooler controls, the Butcher ticket workflow, and point of sale.
 
 ## What is implemented
 
@@ -17,12 +17,18 @@ Butchery OS is a kilogram-first operating system for retail butcheries. The curr
 - Butcher tickets with live product availability, scale-weight capture, snapshot pricing, and stock reservation
 - Open-ticket review and controlled cancellation that releases reserved kilograms
 - Searchable recent-ticket history with paid, awaiting-payment, and cancelled states
+- Keyboard-wedge laser-scanner checkout for Teraoka variable-weight labels and standard EAN/UPC retail barcodes
+- Configurable Teraoka price/weight masks and editable scale PLU-to-product mapping
+- Mixed baskets containing direct scale labels, butcher tickets, and unit products such as canned drinks
+- Cash, card, EFT, customer-account, and exact split-payment capture with change calculation
+- Duplicate weighted-label protection, live receipt generation, sale margin, and controlled full refunds
+- Till opening float, expected cash, closing count, variance confirmation, and session history
 - Weighted-average-ready inventory costing with retained batch provenance
 - Server-side RBAC foundation for ADMIN, MANAGER, WAREHOUSE, BUTCHER, and CASHIER
-- Database schema for stock counts, waste records, butcher tickets, reservations, POS sales, and payments
+- Database schema for stock counts, waste records, butcher tickets, reservations, POS sale lines, retail unit stock, payments, and till sessions
 - Automated critical stock and financial calculation tests
 
-The live interface contains realistic seeded demo data. Cooler-control and Butcher workflow changes persist in the browser on the current device. The PostgreSQL schema and migrations are ready for shared multi-user persistence when a production database is connected.
+The live interface contains realistic seeded demo data. Cooler, Butcher, and POS workflow changes persist in the browser on the current device. The PostgreSQL schema and migrations are ready for shared multi-user persistence when a production database is connected.
 
 ## Stack
 
@@ -70,7 +76,7 @@ npm test
 npm run build
 ```
 
-The core test suite covers yield calculation and profile validation, processing reconciliation, negative-stock prevention, physical-count variance, waste controls, butcher reservation/cancellation, POS reservation-to-sale movement, sale reversal, weighted average cost, and gross margin.
+The core test suite covers yield calculation and profile validation, processing reconciliation, negative-stock prevention, physical-count variance, waste controls, butcher reservation/cancellation, barcode validation and parsing, POS reservation-to-sale movement, split payments, sale reversal, weighted average cost, and gross margin.
 
 ## Vercel deployment
 
@@ -93,4 +99,4 @@ Stock changes belong in `src/lib/services/stock.ts`, where receiving and process
 
 ## Phase roadmap
 
-Cooler stock count, waste control, and the Butcher ticket lifecycle are active. The next agreed phase completes POS payment, sale, refund, and till workflows. Management profitability, supplier analytics, daily reconciliation, and variance reporting follow on the shared schema and ledger.
+Cooler stock count, waste control, the Butcher ticket lifecycle, and POS are active. Management profitability, supplier analytics, daily reconciliation, and variance reporting follow on the shared schema and ledger.
