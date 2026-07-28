@@ -23,6 +23,10 @@ export const movementEnum = pgEnum("movement_type", [
 export const directionEnum = pgEnum("movement_direction", ["IN", "OUT", "RESERVE", "RELEASE"]);
 export const locationEnum = pgEnum("inventory_location", ["RAW_COOLER", "FINISHED_COOLER", "RESERVED", "SOLD", "WASTE"]);
 export const ticketStatusEnum = pgEnum("ticket_status", ["OPEN", "AWAITING_PAYMENT", "PAID", "CANCELLED", "RETURNED", "PARTIALLY_RETURNED"]);
+export const productSaleModeEnum = pgEnum("product_sale_mode", ["WEIGHT", "UNIT"]);
+export const paymentMethodEnum = pgEnum("payment_method", ["CASH", "CARD", "EFT", "CUSTOMER_ACCOUNT"]);
+export const saleStatusEnum = pgEnum("sale_status", ["COMPLETED", "REFUNDED"]);
+export const tillStatusEnum = pgEnum("till_status", ["OPEN", "CLOSED"]);
 
 const money = (name: string) => numeric(name, { precision: 14, scale: 2 });
 const weight = (name: string) => numeric(name, { precision: 14, scale: 3 });
@@ -59,8 +63,13 @@ export const products = pgTable("products", {
   isRaw: boolean("is_raw").default(false).notNull(),
   saleable: boolean("saleable").default(true).notNull(),
   active: boolean("active").default(true).notNull(),
+  saleMode: productSaleModeEnum("sale_mode").default("WEIGHT").notNull(),
+  barcode: text("barcode").unique(),
+  scalePlu: text("scale_plu").unique(),
   sellingPriceKg: money("selling_price_kg").default("0").notNull(),
   averageCostKg: money("average_cost_kg").default("0").notNull(),
+  unitSellingPrice: money("unit_selling_price").default("0").notNull(),
+  unitCost: money("unit_cost").default("0").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -146,6 +155,13 @@ export const inventoryLots = pgTable("inventory_lots", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [index("inventory_product_location_idx").on(t.productId, t.location)]);
 
+export const retailInventory = pgTable("retail_inventory", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  productId: uuid("product_id").notNull().unique().references(() => products.id),
+  physicalUnits: integer("physical_units").default(0).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const stockLedgerEntries = pgTable("stock_ledger_entries", {
   id: uuid("id").defaultRandom().primaryKey(),
   transactionId: text("transaction_id").notNull(),
@@ -225,21 +241,56 @@ export const butcherTicketItems = pgTable("butcher_ticket_items", {
   lineTotal: money("line_total").notNull(),
 });
 
+export const tillSessions = pgTable("till_sessions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  number: text("number").notNull().unique(),
+  cashierId: uuid("cashier_id").notNull().references(() => users.id),
+  status: tillStatusEnum("status").default("OPEN").notNull(),
+  openingFloat: money("opening_float").notNull(),
+  openedAt: timestamp("opened_at", { withTimezone: true }).defaultNow().notNull(),
+  expectedCash: money("expected_cash"),
+  closingCount: money("closing_count"),
+  variance: money("variance"),
+  closedAt: timestamp("closed_at", { withTimezone: true }),
+});
+
 export const sales = pgTable("sales", {
   id: uuid("id").defaultRandom().primaryKey(),
   number: text("number").notNull().unique(),
-  ticketId: uuid("ticket_id").notNull().references(() => butcherTickets.id),
+  receiptNumber: text("receipt_number").notNull().unique(),
+  ticketId: uuid("ticket_id").references(() => butcherTickets.id),
+  customerId: uuid("customer_id").references(() => customers.id),
+  tillSessionId: uuid("till_session_id").notNull().references(() => tillSessions.id),
   cashierId: uuid("cashier_id").notNull().references(() => users.id),
+  status: saleStatusEnum("status").default("COMPLETED").notNull(),
   revenue: money("revenue").notNull(),
   costOfGoods: money("cost_of_goods").notNull(),
   grossProfit: money("gross_profit").notNull(),
+  totalWeightKg: weight("total_weight_kg").default("0").notNull(),
+  totalUnits: integer("total_units").default(0).notNull(),
+  refundReason: text("refund_reason"),
+  refundedAt: timestamp("refunded_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+export const saleItems = pgTable("sale_items", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  saleId: uuid("sale_id").notNull().references(() => sales.id),
+  productId: uuid("product_id").notNull().references(() => products.id),
+  ticketItemId: uuid("ticket_item_id").references(() => butcherTicketItems.id),
+  source: text("source").notNull(),
+  barcode: text("barcode"),
+  weightKg: weight("weight_kg"),
+  quantityUnits: integer("quantity_units"),
+  unitPrice: money("unit_price").notNull(),
+  lineTotal: money("line_total").notNull(),
+  costOfGoods: money("cost_of_goods").notNull(),
+}, (t) => [index("sale_items_sale_idx").on(t.saleId), index("sale_items_barcode_idx").on(t.barcode)]);
 
 export const payments = pgTable("payments", {
   id: uuid("id").defaultRandom().primaryKey(),
   saleId: uuid("sale_id").notNull().references(() => sales.id),
-  method: text("method").notNull(),
+  method: paymentMethodEnum("method").notNull(),
   amount: money("amount").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
