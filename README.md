@@ -23,6 +23,12 @@ Butchery OS is a kilogram-first operating system for retail butcheries. The curr
 - Cash, card, EFT, customer-account, and exact split-payment capture with change calculation
 - Duplicate weighted-label protection, live receipt generation, sale margin, and controlled full refunds
 - Till opening float, expected cash, closing count, variance confirmation, and session history
+- Management command centre with revenue, gross profit, margin, kg sold, purchases, waste, stock variance, cash variance, open tickets, and inventory value
+- Product profitability with opening, produced, sold, revenue, average price/cost, profit, margin, closing stock, and variance
+- Batch profitability with expected-vs-actual yield, realized economics, saleable yield, and remaining stock value
+- Supplier performance ranked by economic yield rather than purchase price alone
+- Unified stock, waste, till, and receiving exception review with persistent management sign-off
+- Daily kilogram reconciliation with a permanent, audit-ready management snapshot
 - Weighted-average-ready inventory costing with retained batch provenance
 - Server-side RBAC foundation for ADMIN, MANAGER, WAREHOUSE, BUTCHER, and CASHIER
 - Database schema for stock counts, waste records, butcher tickets, reservations, POS sale lines, retail unit stock, payments, and till sessions
@@ -76,7 +82,7 @@ npm test
 npm run build
 ```
 
-The core test suite covers yield calculation and profile validation, processing reconciliation, negative-stock prevention, physical-count variance, waste controls, butcher reservation/cancellation, barcode validation and parsing, POS reservation-to-sale movement, split payments, sale reversal, weighted average cost, and gross margin.
+The core test suite covers yield calculation and profile validation, processing reconciliation, negative-stock prevention, physical-count variance, waste controls, butcher reservation/cancellation, barcode validation and parsing, POS reservation-to-sale movement, split payments, sale reversal, weighted average cost, gross margin, batch economics, and supplier ranking.
 
 ## Vercel deployment
 
@@ -99,4 +105,4 @@ Stock changes belong in `src/lib/services/stock.ts`, where receiving and process
 
 ## Phase roadmap
 
-Cooler stock count, waste control, the Butcher ticket lifecycle, and POS are active. Management profitability, supplier analytics, daily reconciliation, and variance reporting follow on the shared schema and ledger.
+Cooler stock count, waste control, the Butcher ticket lifecycle, POS, and Management reporting/control are active. Settings and shared-database administration are the remaining functional phase.
