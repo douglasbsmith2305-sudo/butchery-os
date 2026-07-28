@@ -15,6 +15,13 @@
       "when": 1785183493289,
       "tag": "0001_gray_lord_hawal",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785227759757,
+      "tag": "0002_robust_norman_osborn",
+      "breakpoints": true
     }
   ]
 }
