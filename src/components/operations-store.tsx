@@ -1,7 +1,8 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { inventory as seedInventory } from "@/lib/demo-data";
+import { calculateDeliveryVariance, nextBatchCode, processingStatus, validateBatchProcessing, weightedAverageCost } from "@/lib/cooler";
+import { inventory as seedInventory, profile } from "@/lib/demo-data";
 import { assertCanConsume, cancelReservation, recordWaste as calculateWaste, reconcileStockCount, reserveStock } from "@/lib/inventory";
 import { normalizePlu, paymentDifference } from "@/lib/pos";
 
@@ -179,14 +180,81 @@ export type ReconciliationRecord = ReconciliationSnapshot & {
   createdAt: string;
 };
 
+export type BatchStatus = "Raw" | "Part processed" | "Processed";
+
+export type BatchYieldLine = {
+  productId: string;
+  product: string;
+  percent: number;
+  expectedKg: number;
+  actualKg: number;
+};
+
+export type CoolerBatch = {
+  id: string;
+  code: string;
+  supplier: string;
+  supplierCode: string;
+  invoiceNumber: string;
+  deliveryDate: string;
+  meatType: string;
+  unitCount: number;
+  invoiceWeightKg: number;
+  receivedKg: number;
+  costPerKg: number;
+  totalCost: number;
+  remainingRawKg: number;
+  status: BatchStatus;
+  profileName: string;
+  yields: BatchYieldLine[];
+  notes?: string;
+  receivedBy: string;
+  createdAt: string;
+};
+
+export type ProcessingRun = {
+  id: string;
+  number: string;
+  batchId: string;
+  batchCode: string;
+  inputKg: number;
+  outputKg: number;
+  lossKg: number;
+  lossReason: string;
+  outputs: { productId: string; product: string; expectedKg: number; actualKg: number; varianceKg: number }[];
+  completedBy: string;
+  completedAt: string;
+};
+
+export type ReceiveDeliveryInput = {
+  supplier: string;
+  invoiceNumber: string;
+  deliveryDate: string;
+  meatType: string;
+  unitCount: number;
+  invoiceWeightKg: number;
+  actualWeightKg: number;
+  costPerKg: number;
+  notes?: string;
+};
+
+export type ProcessBatchInput = {
+  batchId: string;
+  inputKg: number;
+  outputs: { productId: string; actualKg: number }[];
+  lossKg: number;
+  lossReason: string;
+};
+
 export type LedgerMovement = {
   id: string;
   product: string;
   quantityKg: number;
-  type: "WASTE" | "PHYSICAL_COUNT_ADJUSTMENT" | "BUTCHER_BOOKING" | "BOOKING_CANCELLATION" | "POS_SALE" | "CUSTOMER_RETURN";
+  type: "SUPPLIER_RECEIPT" | "PROCESSING_INPUT" | "PROCESSING_OUTPUT" | "PROCESSING_LOSS" | "WASTE" | "PHYSICAL_COUNT_ADJUSTMENT" | "BUTCHER_BOOKING" | "BOOKING_CANCELLATION" | "POS_SALE" | "CUSTOMER_RETURN";
   reason: string;
   reference: string;
   createdAt: string;
+  batchCode?: string;
 };
 
 type OperationsState = {
@@ -200,6 +268,8 @@ type OperationsState = {
   tillSessions: TillSession[];
   managementReviews: ManagementReview[];
   reconciliations: ReconciliationRecord[];
+  coolerBatches: CoolerBatch[];
+  processingRuns: ProcessingRun[];
 };
 
 type OperationsContextValue = OperationsState & {
@@ -214,11 +284,13 @@ type OperationsContextValue = OperationsState & {
   closeTill(closingCount: number): TillSession;
   reviewManagementIssue(issueId: string, note: string): void;
   completeReconciliation(input: ReconciliationSnapshot): ReconciliationRecord;
+  receiveDelivery(input: ReceiveDeliveryInput): CoolerBatch;
+  processBatch(input: ProcessBatchInput): ProcessingRun;
   resetDemo(): void;
 };
 
-const STORAGE_KEY = "butchery-os-operations-v4";
-const LEGACY_STORAGE_KEYS = ["butchery-os-operations-v3", "butchery-os-operations-v2"];
+const STORAGE_KEY = "butchery-os-operations-v5";
+const LEGACY_STORAGE_KEYS = ["butchery-os-operations-v4", "butchery-os-operations-v3", "butchery-os-operations-v2"];
 const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 const round3 = (value: number) => Math.round((value + Number.EPSILON) * 1000) / 1000;
 
@@ -283,6 +355,52 @@ const scalePlus: Record<string, string> = {
   "fat-waste": "1012",
 };
 
+function projectedYields(receivedKg: number, actuals: Record<string, number> = {}): BatchYieldLine[] {
+  return profile.map(([product, percent]) => {
+    const productId = slugify(product);
+    return {
+      productId,
+      product,
+      percent,
+      expectedKg: round3(receivedKg * percent / 100),
+      actualKg: round3(actuals[productId] ?? 0),
+    };
+  });
+}
+
+const seededBatches: CoolerBatch[] = [
+  {
+    id: "batch-seed-1", code: "BF-20260727-001", supplier: "Karoo Prime Meats", supplierCode: "KPM",
+    invoiceNumber: "KPM-77841", deliveryDate: "2026-07-27", meatType: "Raw Beef", unitCount: 5,
+    invoiceWeightKg: 718, receivedKg: 720, costPerKg: 92, totalCost: 66240, remainingRawKg: 0,
+    status: "Processed", profileName: "Standard Beef",
+    yields: projectedYields(720, { rump: 48.2, "t-bone": 63.1, "club-steak": 30.1, fillet: 11.4, steak: 121, "short-rib": 38.8, brisket: 36.1, chuck: 57.4, "mince-wors-meat": 130, "stew-beef": 36, bone: 105, "fat-waste": 40.6 }),
+    notes: "Delivery temperature and seals checked.", receivedBy: "Naledi Mokoena", createdAt: "2026-07-27T07:58:00.000Z",
+  },
+  {
+    id: "batch-seed-2", code: "BF-20260726-003", supplier: "Karoo Prime Meats", supplierCode: "KPM",
+    invoiceNumber: "KPM-77798", deliveryDate: "2026-07-26", meatType: "Raw Beef", unitCount: 5,
+    invoiceWeightKg: 686, receivedKg: 684.5, costPerKg: 91.5, totalCost: 62631.75, remainingRawKg: 184.5,
+    status: "Part processed", profileName: "Standard Beef",
+    yields: projectedYields(684.5, { rump: 34.4, "t-bone": 42.2, "club-steak": 19.6, fillet: 7.8, steak: 84.1, "short-rib": 27.1, brisket: 24.9, chuck: 40.1, "mince-wors-meat": 89.8, "stew-beef": 25.1, bone: 76.2, "fat-waste": 28.7 }),
+    receivedBy: "Naledi Mokoena", createdAt: "2026-07-26T09:18:00.000Z",
+  },
+  {
+    id: "batch-seed-3", code: "BF-20260726-002", supplier: "Highveld Beef Co.", supplierCode: "HBC",
+    invoiceNumber: "HBC-40126", deliveryDate: "2026-07-26", meatType: "Raw Beef", unitCount: 5,
+    invoiceWeightKg: 710.4, receivedKg: 712.2, costPerKg: 93.2, totalCost: 66377.04, remainingRawKg: 712.2,
+    status: "Raw", profileName: "Standard Beef", yields: projectedYields(712.2),
+    notes: "Awaiting block-out.", receivedBy: "Naledi Mokoena", createdAt: "2026-07-26T07:34:00.000Z",
+  },
+  {
+    id: "batch-seed-4", code: "BF-20260725-001", supplier: "Lowveld Livestock", supplierCode: "LL",
+    invoiceNumber: "LL-12908", deliveryDate: "2026-07-25", meatType: "Raw Beef", unitCount: 5,
+    invoiceWeightKg: 650, receivedKg: 648.9, costPerKg: 89.8, totalCost: 58271.22, remainingRawKg: 0,
+    status: "Processed", profileName: "Standard Beef", yields: projectedYields(648.9),
+    receivedBy: "Naledi Mokoena", createdAt: "2026-07-25T08:03:00.000Z",
+  },
+];
+
 function createSeedState(): OperationsState {
   const ticketReserved = new Map<string, number>();
   for (const ticket of seededTickets.filter((item) => item.status === "Awaiting payment" || item.status === "Open")) {
@@ -300,7 +418,13 @@ function createSeedState(): OperationsState {
       { id: "waste-seed-2", number: "WR-2030", productId: "mince-wors-meat", product: "Mince/Wors Meat", weightKg: 2.1, costValue: 119.91, reason: "Quality rejection", notes: "Temperature check failed", recordedBy: "Naledi Mokoena", createdAt: "2026-07-26T16:18:00.000Z" },
     ],
     stockCounts: [],
-    ledger: [],
+    ledger: [
+      { id: "ledger-seed-1", product: "Rump", quantityKg: 48.2, type: "PROCESSING_OUTPUT", reason: "Finished output posted to inventory", reference: "PROC-5001", batchCode: "BF-20260727-001", createdAt: "2026-07-27T10:42:00.000Z" },
+      { id: "ledger-seed-2", product: "T-Bone", quantityKg: 63.1, type: "PROCESSING_OUTPUT", reason: "Finished output posted to inventory", reference: "PROC-5001", batchCode: "BF-20260727-001", createdAt: "2026-07-27T10:42:00.000Z" },
+      { id: "ledger-seed-3", product: "Raw Beef", quantityKg: 720, type: "PROCESSING_INPUT", reason: "Raw batch issued to processing", reference: "PROC-5001", batchCode: "BF-20260727-001", createdAt: "2026-07-27T10:41:00.000Z" },
+      { id: "ledger-seed-4", product: "Raw Beef", quantityKg: 720, type: "SUPPLIER_RECEIPT", reason: "Validated supplier delivery", reference: "KPM-77841", batchCode: "BF-20260727-001", createdAt: "2026-07-27T07:58:00.000Z" },
+      { id: "ledger-seed-5", product: "Raw Beef", quantityKg: 712.2, type: "SUPPLIER_RECEIPT", reason: "Validated supplier delivery", reference: "HBC-40126", batchCode: "BF-20260726-002", createdAt: "2026-07-26T07:34:00.000Z" },
+    ],
     retailProducts: [
       {
         id: "retail-coke-330",
@@ -357,6 +481,15 @@ function createSeedState(): OperationsState {
     ],
     managementReviews: [],
     reconciliations: [],
+    coolerBatches: seededBatches,
+    processingRuns: [
+      {
+        id: "processing-seed-1", number: "PROC-5001", batchId: "batch-seed-1", batchCode: "BF-20260727-001",
+        inputKg: 720, outputKg: 717.7, lossKg: 2.3, lossReason: "Moisture / processing loss",
+        outputs: seededBatches[0].yields.map((item) => ({ productId: item.productId, product: item.product, expectedKg: item.expectedKg, actualKg: item.actualKg, varianceKg: round3(item.actualKg - item.expectedKg) })),
+        completedBy: "Johan Botha", completedAt: "2026-07-27T10:42:00.000Z",
+      },
+    ],
   };
 }
 
@@ -381,6 +514,8 @@ function upgradeState(saved: Partial<OperationsState>): OperationsState {
     tillSessions: saved.tillSessions ?? seed.tillSessions,
     managementReviews: saved.managementReviews ?? seed.managementReviews,
     reconciliations: saved.reconciliations ?? seed.reconciliations,
+    coolerBatches: saved.coolerBatches ?? seed.coolerBatches,
+    processingRuns: saved.processingRuns ?? seed.processingRuns,
   };
 }
 
@@ -802,6 +937,104 @@ export function OperationsProvider({ children }: { children: React.ReactNode }) 
         createdAt: new Date().toISOString(),
       };
       setState({ ...state, reconciliations: [created, ...state.reconciliations] });
+      return created;
+    },
+    receiveDelivery(input) {
+      if (!input.supplier.trim()) throw new Error("Select a supplier");
+      if (!input.invoiceNumber.trim()) throw new Error("Enter the supplier invoice number");
+      if (!Number.isInteger(input.unitCount) || input.unitCount <= 0) throw new Error("Units must be a positive whole number");
+      if (state.coolerBatches.some((batch) => batch.invoiceNumber.toLowerCase() === input.invoiceNumber.trim().toLowerCase())) {
+        throw new Error("That supplier invoice has already been received");
+      }
+      const calculation = calculateDeliveryVariance(input.invoiceWeightKg, input.actualWeightKg, input.costPerKg);
+      const code = nextBatchCode(state.coolerBatches.map((batch) => batch.code), input.deliveryDate);
+      const createdAt = new Date().toISOString();
+      const created: CoolerBatch = {
+        id: crypto.randomUUID(),
+        code,
+        supplier: input.supplier.trim(),
+        supplierCode: input.supplier.split(/\s+/).map((part) => part[0]).join("").slice(0, 4).toUpperCase(),
+        invoiceNumber: input.invoiceNumber.trim(),
+        deliveryDate: input.deliveryDate,
+        meatType: input.meatType,
+        unitCount: input.unitCount,
+        invoiceWeightKg: round3(input.invoiceWeightKg),
+        receivedKg: round3(input.actualWeightKg),
+        costPerKg: round2(input.costPerKg),
+        totalCost: calculation.totalCost,
+        remainingRawKg: round3(input.actualWeightKg),
+        status: "Raw",
+        profileName: "Standard Beef",
+        yields: projectedYields(input.actualWeightKg),
+        notes: input.notes?.trim() || undefined,
+        receivedBy: "Naledi Mokoena",
+        createdAt,
+      };
+      const movement: LedgerMovement = {
+        id: crypto.randomUUID(), product: input.meatType, quantityKg: created.receivedKg,
+        type: "SUPPLIER_RECEIPT", reason: "Validated supplier delivery", reference: created.invoiceNumber,
+        batchCode: created.code, createdAt,
+      };
+      setState({ ...state, coolerBatches: [created, ...state.coolerBatches], ledger: [movement, ...state.ledger] });
+      return created;
+    },
+    processBatch(input) {
+      const batch = state.coolerBatches.find((item) => item.id === input.batchId);
+      if (!batch) throw new Error("Batch not found");
+      if (input.inputKg > batch.remainingRawKg + .001) throw new Error(`Only ${batch.remainingRawKg.toFixed(3)} kg of raw stock remains`);
+      if (input.lossKg > 0 && !input.lossReason.trim()) throw new Error("Select a reason for recorded loss");
+      const reconciliation = validateBatchProcessing(input.inputKg, input.outputs, input.lossKg);
+      const inventory = state.inventory.map((item) => ({ ...item }));
+      const completedAt = new Date().toISOString();
+      const outputs = input.outputs.filter((item) => item.actualKg > 0).map((entry) => {
+        const stock = inventory.find((item) => item.id === entry.productId);
+        if (!stock) throw new Error("A processing output is not mapped to inventory");
+        const expected = round3(input.inputKg * (batch.yields.find((item) => item.productId === entry.productId)?.percent ?? 0) / 100);
+        stock.cost = weightedAverageCost(stock.physical, stock.cost, entry.actualKg, batch.costPerKg);
+        stock.physical = round3(stock.physical + entry.actualKg);
+        stock.movement = "Just now";
+        return {
+          productId: stock.id, product: stock.product, expectedKg: expected,
+          actualKg: round3(entry.actualKg), varianceKg: round3(entry.actualKg - expected),
+        };
+      });
+      const remainingRawKg = round3(Math.max(0, batch.remainingRawKg - input.inputKg));
+      const coolerBatches = state.coolerBatches.map((item) => item.id !== batch.id ? item : {
+        ...item,
+        remainingRawKg,
+        status: processingStatus(item.receivedKg, remainingRawKg),
+        yields: item.yields.map((yieldLine) => ({
+          ...yieldLine,
+          actualKg: round3(yieldLine.actualKg + (input.outputs.find((output) => output.productId === yieldLine.productId)?.actualKg ?? 0)),
+        })),
+      });
+      const highest = Math.max(5000, ...state.processingRuns.map((run) => Number(run.number.replace("PROC-", "")) || 0));
+      const created: ProcessingRun = {
+        id: crypto.randomUUID(), number: `PROC-${highest + 1}`, batchId: batch.id, batchCode: batch.code,
+        inputKg: round3(input.inputKg), outputKg: reconciliation.outputKg, lossKg: round3(input.lossKg),
+        lossReason: input.lossReason.trim(), outputs, completedBy: "Johan Botha", completedAt,
+      };
+      const ledger: LedgerMovement[] = [
+        {
+          id: crypto.randomUUID(), product: batch.meatType, quantityKg: created.inputKg,
+          type: "PROCESSING_INPUT", reason: "Raw batch issued to processing", reference: created.number,
+          batchCode: batch.code, createdAt: completedAt,
+        },
+        ...outputs.map((item): LedgerMovement => ({
+          id: crypto.randomUUID(), product: item.product, quantityKg: item.actualKg,
+          type: "PROCESSING_OUTPUT", reason: "Finished output posted to inventory", reference: created.number,
+          batchCode: batch.code, createdAt: completedAt,
+        })),
+      ];
+      if (input.lossKg > 0) ledger.push({
+        id: crypto.randomUUID(), product: "Processing loss", quantityKg: input.lossKg,
+        type: "PROCESSING_LOSS", reason: input.lossReason, reference: created.number,
+        batchCode: batch.code, createdAt: completedAt,
+      });
+      setState({
+        ...state, inventory, coolerBatches, processingRuns: [created, ...state.processingRuns],
+        ledger: [...ledger, ...state.ledger],
+      });
       return created;
     },
     resetDemo() {
