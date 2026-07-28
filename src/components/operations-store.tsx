@@ -2,7 +2,8 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { inventory as seedInventory } from "@/lib/demo-data";
-import { cancelReservation, recordWaste as calculateWaste, reconcileStockCount, reserveStock } from "@/lib/inventory";
+import { assertCanConsume, cancelReservation, recordWaste as calculateWaste, reconcileStockCount, reserveStock } from "@/lib/inventory";
+import { normalizePlu, paymentDifference } from "@/lib/pos";
 
 export type InventoryItem = {
   id: string;
@@ -12,6 +13,7 @@ export type InventoryItem = {
   cost: number;
   price: number;
   movement: string;
+  scalePlu: string;
 };
 
 export type TicketStatus = "Open" | "Awaiting payment" | "Paid" | "Cancelled" | "Returned";
@@ -74,11 +76,84 @@ export type NewTicketInput = {
   items: { productId: string; weightKg: number }[];
 };
 
-type LedgerMovement = {
+export type RetailProduct = {
+  id: string;
+  sku: string;
+  name: string;
+  barcode: string;
+  price: number;
+  cost: number;
+  stockUnits: number;
+  category: string;
+};
+
+export type PaymentMethod = "Cash" | "Card" | "EFT" | "Customer account";
+export type SaleStatus = "Completed" | "Refunded";
+
+export type SaleLine = {
+  id: string;
+  source: "scale" | "ticket" | "retail";
+  productId: string;
+  product: string;
+  barcode?: string;
+  ticketId?: string;
+  ticketNumber?: string;
+  weightKg?: number;
+  quantity?: number;
+  unitPrice: number;
+  lineTotal: number;
+  costOfGoods: number;
+};
+
+export type SaleRecord = {
+  id: string;
+  number: string;
+  receiptNumber: string;
+  status: SaleStatus;
+  customer: string;
+  cashier: string;
+  items: SaleLine[];
+  payments: { id: string; method: PaymentMethod; amount: number }[];
+  revenue: number;
+  costOfGoods: number;
+  grossProfit: number;
+  grossMargin: number;
+  totalKg: number;
+  totalUnits: number;
+  createdAt: string;
+  refundedAt?: string;
+  refundReason?: string;
+};
+
+export type TillSession = {
+  id: string;
+  number: string;
+  status: "Open" | "Closed";
+  cashier: string;
+  openingFloat: number;
+  openedAt: string;
+  closingCount?: number;
+  expectedCash?: number;
+  variance?: number;
+  closedAt?: string;
+};
+
+export type PosSaleInputLine =
+  | { source: "scale"; productId: string; barcode: string; weightKg: number; lineTotal: number }
+  | { source: "ticket"; ticketId: string }
+  | { source: "retail"; retailProductId: string; quantity: number };
+
+export type CompleteSaleInput = {
+  customer: string;
+  lines: PosSaleInputLine[];
+  payments: { method: PaymentMethod; amount: number }[];
+};
+
+export type LedgerMovement = {
   id: string;
   product: string;
   quantityKg: number;
-  type: "WASTE" | "PHYSICAL_COUNT_ADJUSTMENT" | "BUTCHER_BOOKING" | "BOOKING_CANCELLATION";
+  type: "WASTE" | "PHYSICAL_COUNT_ADJUSTMENT" | "BUTCHER_BOOKING" | "BOOKING_CANCELLATION" | "POS_SALE" | "CUSTOMER_RETURN";
   reason: string;
   reference: string;
   createdAt: string;
@@ -90,6 +165,9 @@ type OperationsState = {
   waste: WasteRecord[];
   stockCounts: StockCountRecord[];
   ledger: LedgerMovement[];
+  retailProducts: RetailProduct[];
+  sales: SaleRecord[];
+  tillSessions: TillSession[];
 };
 
 type OperationsContextValue = OperationsState & {
@@ -97,10 +175,16 @@ type OperationsContextValue = OperationsState & {
   cancelTicket(ticketId: string, reason: string): void;
   recordWaste(input: { productId: string; weightKg: number; reason: string; notes?: string }): WasteRecord;
   submitStockCount(items: CountSubmission[]): StockCountRecord;
+  completeSale(input: CompleteSaleInput): SaleRecord;
+  refundSale(saleId: string, reason: string): void;
+  updateScalePlu(productId: string, plu: string): void;
+  openTill(openingFloat: number): TillSession;
+  closeTill(closingCount: number): TillSession;
   resetDemo(): void;
 };
 
-const STORAGE_KEY = "butchery-os-operations-v2";
+const STORAGE_KEY = "butchery-os-operations-v3";
+const LEGACY_STORAGE_KEY = "butchery-os-operations-v2";
 const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 const round3 = (value: number) => Math.round((value + Number.EPSILON) * 1000) / 1000;
 
@@ -113,7 +197,7 @@ const seededTickets: ButcherTicket[] = [
     status: "Awaiting payment",
     items: [
       { id: "item-1", productId: "rump", product: "Rump", weightKg: 2.3, pricePerKg: 169.99, lineTotal: 390.98 },
-      { id: "item-2", productId: "wors", product: "Wors", weightKg: 1.5, pricePerKg: 109.99, lineTotal: 164.99 },
+      { id: "item-2", productId: "mince-wors-meat", product: "Mince/Wors Meat", weightKg: 1.5, pricePerKg: 109.99, lineTotal: 164.99 },
       { id: "item-3", productId: "t-bone", product: "T-Bone", weightKg: 3.1, pricePerKg: 179.99, lineTotal: 557.97 },
     ],
     total: 1113.94,
@@ -150,6 +234,21 @@ function slugify(value: string) {
   return value.toLowerCase().replaceAll("/", "-").replaceAll(" ", "-");
 }
 
+const scalePlus: Record<string, string> = {
+  rump: "4444",
+  "t-bone": "1002",
+  "club-steak": "1003",
+  fillet: "1004",
+  steak: "1005",
+  "short-rib": "1006",
+  brisket: "1007",
+  chuck: "1008",
+  "mince-wors-meat": "1009",
+  "stew-beef": "1010",
+  bone: "1011",
+  "fat-waste": "1012",
+};
+
 function createSeedState(): OperationsState {
   const ticketReserved = new Map<string, number>();
   for (const ticket of seededTickets.filter((item) => item.status === "Awaiting payment" || item.status === "Open")) {
@@ -159,7 +258,7 @@ function createSeedState(): OperationsState {
   return {
     inventory: seedInventory.map((item) => {
       const id = slugify(item.product);
-      return { id, ...item, reserved: ticketReserved.get(id) ?? item.reserved };
+      return { id, ...item, scalePlu: scalePlus[id], reserved: ticketReserved.get(id) ?? item.reserved };
     }),
     tickets: seededTickets,
     waste: [
@@ -168,6 +267,82 @@ function createSeedState(): OperationsState {
     ],
     stockCounts: [],
     ledger: [],
+    retailProducts: [
+      {
+        id: "retail-coke-330",
+        sku: "BEV-COKE-330",
+        name: "Coca-Cola Original 330 ml",
+        barcode: "5449000000996",
+        price: 15.99,
+        cost: 10.2,
+        stockUnits: 48,
+        category: "Cold drinks",
+      },
+    ],
+    sales: [
+      {
+        id: "sale-seed-1",
+        number: "SAL-9001",
+        receiptNumber: "RCP-9001",
+        status: "Completed",
+        customer: "Thabo Nkosi",
+        cashier: "Ayanda Khumalo",
+        items: [
+          {
+            id: "sale-line-seed-1",
+            source: "ticket",
+            productId: "steak",
+            product: "Steak",
+            ticketId: "ticket-seed-2",
+            ticketNumber: "BT-10481",
+            weightKg: 4.8,
+            unitPrice: 149.99,
+            lineTotal: 719.95,
+            costOfGoods: 424.32,
+          },
+        ],
+        payments: [{ id: "payment-seed-1", method: "Card", amount: 719.95 }],
+        revenue: 719.95,
+        costOfGoods: 424.32,
+        grossProfit: 295.63,
+        grossMargin: 41.06,
+        totalKg: 4.8,
+        totalUnits: 0,
+        createdAt: "2026-07-27T08:59:00.000Z",
+      },
+    ],
+    tillSessions: [
+      {
+        id: "till-seed-1",
+        number: "TILL-301",
+        status: "Open",
+        cashier: "Ayanda Khumalo",
+        openingFloat: 500,
+        openedAt: "2026-07-28T06:00:00.000Z",
+      },
+    ],
+  };
+}
+
+function upgradeState(saved: Partial<OperationsState>): OperationsState {
+  const seed = createSeedState();
+  const savedInventory = saved.inventory ?? seed.inventory;
+  return {
+    ...seed,
+    ...saved,
+    inventory: savedInventory.map((item) => ({
+      ...item,
+      scalePlu: item.scalePlu ?? seed.inventory.find((seedItem) => seedItem.id === item.id)?.scalePlu ?? "",
+    })),
+    tickets: (saved.tickets ?? seed.tickets).map((ticket) => ({
+      ...ticket,
+      items: ticket.items.map((item) => item.productId === "wors"
+        ? { ...item, productId: "mince-wors-meat", product: "Mince/Wors Meat" }
+        : item),
+    })),
+    retailProducts: saved.retailProducts ?? seed.retailProducts,
+    sales: saved.sales ?? seed.sales,
+    tillSessions: saved.tillSessions ?? seed.tillSessions,
   };
 }
 
@@ -181,10 +356,10 @@ export function OperationsProvider({ children }: { children: React.ReactNode }) 
     let cancelled = false;
     queueMicrotask(() => {
       if (cancelled) return;
-      const saved = window.localStorage.getItem(STORAGE_KEY);
+      const saved = window.localStorage.getItem(STORAGE_KEY) ?? window.localStorage.getItem(LEGACY_STORAGE_KEY);
       if (saved) {
         try {
-          setState(JSON.parse(saved) as OperationsState);
+          setState(upgradeState(JSON.parse(saved) as Partial<OperationsState>));
         } catch {
           window.localStorage.removeItem(STORAGE_KEY);
         }
@@ -320,6 +495,247 @@ export function OperationsProvider({ children }: { children: React.ReactNode }) 
       };
       setState({ ...state, inventory, stockCounts: [created, ...state.stockCounts], ledger: [...ledger, ...state.ledger] });
       return created;
+    },
+    completeSale(input) {
+      const till = state.tillSessions.find((session) => session.status === "Open");
+      if (!till) throw new Error("Open a till session before taking payment");
+      if (input.lines.length === 0) throw new Error("Add at least one item or butcher ticket");
+      if (input.payments.length === 0) throw new Error("Capture at least one payment");
+
+      const inventory = state.inventory.map((item) => ({ ...item }));
+      const retailProducts = state.retailProducts.map((item) => ({ ...item }));
+      let tickets = state.tickets.map((item) => ({ ...item }));
+      const saleLines: SaleLine[] = [];
+      const ledger: LedgerMovement[] = [];
+      const createdAt = new Date().toISOString();
+      const scannedLabels = new Set<string>();
+      const ticketIds = new Set<string>();
+
+      for (const line of input.lines) {
+        if (line.source === "scale") {
+          if (scannedLabels.has(line.barcode) || state.sales.some((sale) => sale.items.some((item) => item.barcode === line.barcode))) {
+            throw new Error("This weighted label has already been sold or added");
+          }
+          scannedLabels.add(line.barcode);
+          const stock = inventory.find((item) => item.id === line.productId);
+          if (!stock) throw new Error("Scale product not found");
+          assertCanConsume(round3(stock.physical - stock.reserved), line.weightKg);
+          stock.physical = round3(stock.physical - line.weightKg);
+          stock.movement = "Just now";
+          saleLines.push({
+            id: crypto.randomUUID(),
+            source: "scale",
+            productId: stock.id,
+            product: stock.product,
+            barcode: line.barcode,
+            weightKg: round3(line.weightKg),
+            unitPrice: stock.price,
+            lineTotal: round2(line.lineTotal),
+            costOfGoods: round2(line.weightKg * stock.cost),
+          });
+          ledger.push({
+            id: crypto.randomUUID(),
+            product: stock.product,
+            quantityKg: round3(line.weightKg),
+            type: "POS_SALE",
+            reason: "Teraoka scale label sold at POS",
+            reference: "PENDING",
+            createdAt,
+          });
+          continue;
+        }
+
+        if (line.source === "ticket") {
+          if (ticketIds.has(line.ticketId)) throw new Error("A butcher ticket can only be added once");
+          ticketIds.add(line.ticketId);
+          const ticket = tickets.find((item) => item.id === line.ticketId);
+          if (!ticket || (ticket.status !== "Open" && ticket.status !== "Awaiting payment")) {
+            throw new Error("Butcher ticket is no longer awaiting payment");
+          }
+          for (const item of ticket.items) {
+            const stock = inventory.find((inventoryItem) => inventoryItem.id === item.productId);
+            if (!stock) throw new Error(`${item.product} is not mapped to Cooler stock`);
+            assertCanConsume(stock.reserved, item.weightKg);
+            assertCanConsume(stock.physical, item.weightKg);
+            stock.physical = round3(stock.physical - item.weightKg);
+            stock.reserved = round3(stock.reserved - item.weightKg);
+            stock.movement = "Just now";
+            saleLines.push({
+              id: crypto.randomUUID(),
+              source: "ticket",
+              productId: stock.id,
+              product: item.product,
+              ticketId: ticket.id,
+              ticketNumber: ticket.number,
+              weightKg: item.weightKg,
+              unitPrice: item.pricePerKg,
+              lineTotal: item.lineTotal,
+              costOfGoods: round2(item.weightKg * stock.cost),
+            });
+            ledger.push({
+              id: crypto.randomUUID(),
+              product: stock.product,
+              quantityKg: item.weightKg,
+              type: "POS_SALE",
+              reason: "Reserved butcher ticket completed at POS",
+              reference: ticket.number,
+              createdAt,
+            });
+          }
+          tickets = tickets.map((item) => item.id === ticket.id ? { ...item, status: "Paid" as const } : item);
+          continue;
+        }
+
+        const retail = retailProducts.find((item) => item.id === line.retailProductId);
+        if (!retail) throw new Error("Retail product not found");
+        if (!Number.isInteger(line.quantity) || line.quantity <= 0) throw new Error("Retail quantity must be a positive whole number");
+        if (line.quantity > retail.stockUnits) throw new Error(`${retail.name}: only ${retail.stockUnits} units available`);
+        retail.stockUnits -= line.quantity;
+        saleLines.push({
+          id: crypto.randomUUID(),
+          source: "retail",
+          productId: retail.id,
+          product: retail.name,
+          barcode: retail.barcode,
+          quantity: line.quantity,
+          unitPrice: retail.price,
+          lineTotal: round2(retail.price * line.quantity),
+          costOfGoods: round2(retail.cost * line.quantity),
+        });
+      }
+
+      const revenue = round2(saleLines.reduce((sum, item) => sum + item.lineTotal, 0));
+      const normalizedPayments = input.payments
+        .filter((payment) => payment.amount > 0)
+        .map((payment) => ({ ...payment, amount: round2(payment.amount) }));
+      if (Math.abs(paymentDifference(revenue, normalizedPayments)) > 0.001) {
+        throw new Error(`Payments must equal ${revenue.toFixed(2)}`);
+      }
+      const costOfGoods = round2(saleLines.reduce((sum, item) => sum + item.costOfGoods, 0));
+      const highestSale = Math.max(9001, ...state.sales.map((sale) => Number(sale.number.replace("SAL-", "")) || 0));
+      const number = `SAL-${highestSale + 1}`;
+      const grossProfit = round2(revenue - costOfGoods);
+      const created: SaleRecord = {
+        id: crypto.randomUUID(),
+        number,
+        receiptNumber: `RCP-${highestSale + 1}`,
+        status: "Completed",
+        customer: input.customer.trim() || "Walk-in",
+        cashier: "Ayanda Khumalo",
+        items: saleLines,
+        payments: normalizedPayments.map((payment) => ({ id: crypto.randomUUID(), ...payment })),
+        revenue,
+        costOfGoods,
+        grossProfit,
+        grossMargin: revenue === 0 ? 0 : round2((grossProfit / revenue) * 100),
+        totalKg: round3(saleLines.reduce((sum, item) => sum + (item.weightKg ?? 0), 0)),
+        totalUnits: saleLines.reduce((sum, item) => sum + (item.quantity ?? 0), 0),
+        createdAt,
+      };
+      const completedLedger = ledger.map((item) => ({ ...item, reference: item.reference === "PENDING" ? number : item.reference }));
+      setState({
+        ...state,
+        inventory,
+        retailProducts,
+        tickets,
+        sales: [created, ...state.sales],
+        ledger: [...completedLedger, ...state.ledger],
+      });
+      return created;
+    },
+    refundSale(saleId, reason) {
+      const sale = state.sales.find((item) => item.id === saleId);
+      if (!sale || sale.status !== "Completed") throw new Error("Only completed sales can be refunded");
+      if (!reason.trim()) throw new Error("Select a refund reason");
+      const inventory = state.inventory.map((item) => ({ ...item }));
+      const retailProducts = state.retailProducts.map((item) => ({ ...item }));
+      let tickets = state.tickets.map((item) => ({ ...item }));
+      const refundedAt = new Date().toISOString();
+      const ledger: LedgerMovement[] = [];
+      for (const line of sale.items) {
+        if (line.source === "retail") {
+          const retail = retailProducts.find((item) => item.id === line.productId);
+          if (retail) retail.stockUnits += line.quantity ?? 0;
+          continue;
+        }
+        const stock = inventory.find((item) => item.id === line.productId);
+        if (stock) {
+          stock.physical = round3(stock.physical + (line.weightKg ?? 0));
+          stock.movement = "Just now";
+          ledger.push({
+            id: crypto.randomUUID(),
+            product: stock.product,
+            quantityKg: line.weightKg ?? 0,
+            type: "CUSTOMER_RETURN",
+            reason,
+            reference: sale.number,
+            createdAt: refundedAt,
+          });
+        }
+        if (line.ticketId) {
+          tickets = tickets.map((ticket) => ticket.id === line.ticketId ? { ...ticket, status: "Returned" as const } : ticket);
+        }
+      }
+      const sales = state.sales.map((item) => item.id === saleId ? {
+        ...item,
+        status: "Refunded" as const,
+        refundedAt,
+        refundReason: reason,
+      } : item);
+      setState({
+        ...state,
+        inventory,
+        retailProducts,
+        tickets,
+        sales,
+        ledger: [...ledger, ...state.ledger],
+      });
+    },
+    updateScalePlu(productId, plu) {
+      const normalized = normalizePlu(plu);
+      if (!/^\d{1,5}$/.test(plu)) throw new Error("PLU must contain 1 to 5 digits");
+      if (state.inventory.some((item) => item.id !== productId && normalizePlu(item.scalePlu) === normalized)) {
+        throw new Error("That PLU is already assigned to another product");
+      }
+      const inventory = state.inventory.map((item) => item.id === productId ? { ...item, scalePlu: plu } : item);
+      setState({ ...state, inventory });
+    },
+    openTill(openingFloat) {
+      if (state.tillSessions.some((session) => session.status === "Open")) throw new Error("A till session is already open");
+      if (!Number.isFinite(openingFloat) || openingFloat < 0) throw new Error("Opening float cannot be negative");
+      const highestTill = Math.max(301, ...state.tillSessions.map((session) => Number(session.number.replace("TILL-", "")) || 0));
+      const created: TillSession = {
+        id: crypto.randomUUID(),
+        number: `TILL-${highestTill + 1}`,
+        status: "Open",
+        cashier: "Ayanda Khumalo",
+        openingFloat: round2(openingFloat),
+        openedAt: new Date().toISOString(),
+      };
+      setState({ ...state, tillSessions: [created, ...state.tillSessions] });
+      return created;
+    },
+    closeTill(closingCount) {
+      const till = state.tillSessions.find((session) => session.status === "Open");
+      if (!till) throw new Error("No till session is open");
+      if (!Number.isFinite(closingCount) || closingCount < 0) throw new Error("Closing cash cannot be negative");
+      const cashSales = state.sales
+        .filter((sale) => sale.status === "Completed" && sale.createdAt >= till.openedAt)
+        .flatMap((sale) => sale.payments)
+        .filter((payment) => payment.method === "Cash")
+        .reduce((sum, payment) => sum + payment.amount, 0);
+      const expectedCash = round2(till.openingFloat + cashSales);
+      const closed: TillSession = {
+        ...till,
+        status: "Closed",
+        closingCount: round2(closingCount),
+        expectedCash,
+        variance: round2(closingCount - expectedCash),
+        closedAt: new Date().toISOString(),
+      };
+      const tillSessions = state.tillSessions.map((session) => session.id === till.id ? closed : session);
+      setState({ ...state, tillSessions });
+      return closed;
     },
     resetDemo() {
       setState(createSeedState());

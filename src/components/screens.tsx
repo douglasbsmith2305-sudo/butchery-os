@@ -9,6 +9,9 @@ import { useMemo, useState } from "react";
 import { NewTicketScreen, OpenTicketsScreen, RecentTicketsScreen } from "@/components/butcher-workflows";
 import { StockCountScreen, WasteScreen } from "@/components/cooler-workflows";
 import { useOperations } from "@/components/operations-store";
+import { PosCheckoutScreen } from "@/components/pos-checkout";
+import { PosSalesScreen } from "@/components/pos-sales";
+import { PosTillScreen } from "@/components/pos-till";
 import { batches, profile, recentLedger } from "@/lib/demo-data";
 import { calculateProjectedYields, reconcileProcessing } from "@/lib/inventory";
 import { kg, zar } from "@/lib/utils";
@@ -170,5 +173,8 @@ export function ScreenRouter({ path }: { path: string }) {
   if (path === "/butcher/new") return <NewTicketScreen/>;
   if (path === "/butcher/open") return <OpenTicketsScreen/>;
   if (path === "/butcher/recent") return <RecentTicketsScreen/>;
+  if (path === "/pos/checkout") return <PosCheckoutScreen/>;
+  if (path === "/pos/sales") return <PosSalesScreen/>;
+  if (path === "/pos/till") return <PosTillScreen/>;
   return <Placeholder path={path}/>;
 }

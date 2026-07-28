@@ -40,6 +40,7 @@ const groups = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const isPos = pathname.startsWith("/pos");
   return (
     <div className="min-h-screen">
       {mobileOpen && <button aria-label="Close menu" className="fixed inset-0 z-40 bg-black/70 lg:hidden" onClick={() => setMobileOpen(false)} />}
@@ -64,8 +65,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
         <div className="border-t border-[#242a30] p-3">
           <button className="flex w-full items-center gap-3 rounded-lg p-2 text-left hover:bg-[#15191d]">
-            <div className="grid size-8 place-items-center rounded-full bg-[#24323a] text-xs font-semibold text-[#a7c7d8]">NM</div>
-            <div className="min-w-0 flex-1"><div className="truncate text-xs font-medium">Naledi Mokoena</div><div className="text-[10px] uppercase tracking-wider text-[#69737d]">Warehouse</div></div>
+            <div className="grid size-8 place-items-center rounded-full bg-[#24323a] text-xs font-semibold text-[#a7c7d8]">{isPos ? "AK" : "NM"}</div>
+            <div className="min-w-0 flex-1"><div className="truncate text-xs font-medium">{isPos ? "Ayanda Khumalo" : "Naledi Mokoena"}</div><div className="text-[10px] uppercase tracking-wider text-[#69737d]">{isPos ? "Cashier" : "Warehouse"}</div></div>
             <ChevronDown size={14} className="text-[#69737d]"/>
           </button>
         </div>
