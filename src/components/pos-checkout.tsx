@@ -83,6 +83,7 @@ export function PosCheckoutScreen() {
 
   const openTill = tillSessions.find((session) => session.status === "Open");
   const openTickets = tickets.filter((ticket) => ticket.status === "Open" || ticket.status === "Awaiting payment");
+  const activeRetailProducts = retailProducts.filter((item) => item.active);
   const scaleFormats = DEFAULT_SCALE_FORMATS.filter((format) => format.prefix === "20");
   const selectedScaleFormat = scaleFormats.find((format) => format.id === scaleFormatId) ?? scaleFormats[0];
 
@@ -143,12 +144,12 @@ export function PosCheckoutScreen() {
       const formats = normalized.startsWith("21")
         ? DEFAULT_SCALE_FORMATS.filter((format) => format.prefix === "21")
         : selectedScaleFormat ? [selectedScaleFormat] : DEFAULT_SCALE_FORMATS;
-      const parsed = parseBarcode(normalized, formats, inventory.map((item) => item.scalePlu));
+      const parsed = parseBarcode(normalized, formats, inventory.filter((item) => item.active).map((item) => item.scalePlu));
       if (parsed.kind === "scale") {
         if (cart.some((line) => line.source === "scale" && line.barcode === parsed.raw)) {
           throw new Error("That weighted label is already in the basket");
         }
-        const stock = inventory.find((item) => normalizePlu(item.scalePlu) === normalizePlu(parsed.plu));
+        const stock = inventory.find((item) => item.active && normalizePlu(item.scalePlu) === normalizePlu(parsed.plu));
         if (!stock) throw new Error(`Scale PLU ${parsed.plu} is not mapped. Open Scale setup to assign it.`);
         const calculated = calculateScaleLine(parsed, stock.price);
         if (calculated.weightKg > stock.physical - stock.reserved) {
@@ -167,7 +168,7 @@ export function PosCheckoutScreen() {
         }]);
         setMessage({ type: "success", text: `${stock.product} scanned: ${calculated.weightKg.toFixed(3)} kg at ${zar.format(calculated.lineTotal)}.` });
       } else {
-        const retail = retailProducts.find((item) => item.barcode === parsed.raw);
+        const retail = activeRetailProducts.find((item) => item.barcode === parsed.raw);
         if (!retail) throw new Error(`Barcode ${parsed.raw} is not in the retail product catalog`);
         const existing = cart.find((line) => line.source === "retail" && line.retailProductId === retail.id);
         if (existing?.source === "retail" && existing.quantity >= retail.stockUnits) {
