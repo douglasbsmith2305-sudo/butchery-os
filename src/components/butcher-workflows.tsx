@@ -48,7 +48,7 @@ export function NewTicketScreen() {
   const [butcher, setButcher] = useState("Johan van Wyk");
   const [cart, setCart] = useState<CartLine[]>([]);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string; ticket?: ButcherTicket } | null>(null);
-  const products = useMemo(() => inventory.filter((item) => item.price > 0 && item.physical - item.reserved > 0 && item.product.toLowerCase().includes(query.toLowerCase())), [inventory, query]);
+  const products = useMemo(() => inventory.filter((item) => item.active && item.price > 0 && item.physical - item.reserved > 0 && item.product.toLowerCase().includes(query.toLowerCase())), [inventory, query]);
 
   const cartDetails = cart.map((line) => {
     const stock = inventory.find((item) => item.id === line.productId);
