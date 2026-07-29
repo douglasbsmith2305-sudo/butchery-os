@@ -23,6 +23,10 @@ import {
   SupplierPerformanceScreen,
   VariancesScreen,
 } from "@/components/management-screens";
+import {
+  BackOfficeDashboard, BlockTestProfilesScreen, CsvImportScreen, FoodSafetyScreen,
+  ProductsSettingsScreen, PurchasingScreen, SuppliersSettingsScreen, UsersSettingsScreen,
+} from "@/components/backoffice-screens";
 import { batches, profile } from "@/lib/demo-data";
 import { calculateProjectedYields, reconcileProcessing } from "@/lib/inventory";
 import { kg, zar } from "@/lib/utils";
@@ -202,5 +206,13 @@ export function ScreenRouter({ path }: { path: string }) {
   if (path === "/management/suppliers") return <SupplierPerformanceScreen/>;
   if (path === "/management/variances") return <VariancesScreen/>;
   if (path === "/management/reconciliation") return <ReconciliationScreen/>;
+  if (path === "/backoffice") return <BackOfficeDashboard/>;
+  if (path === "/backoffice/import") return <CsvImportScreen/>;
+  if (path === "/backoffice/purchases") return <PurchasingScreen/>;
+  if (path === "/backoffice/food-safety") return <FoodSafetyScreen/>;
+  if (path === "/settings/products") return <ProductsSettingsScreen/>;
+  if (path === "/settings/block-tests") return <BlockTestProfilesScreen/>;
+  if (path === "/settings/suppliers") return <SuppliersSettingsScreen/>;
+  if (path === "/settings/users") return <UsersSettingsScreen/>;
   return <Placeholder path={path}/>;
 }
