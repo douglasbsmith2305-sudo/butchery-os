@@ -22,11 +22,11 @@ import {
 } from "@/lib/pos";
 import { kg, zar } from "@/lib/utils";
 
-const card = "rounded-xl border border-[#272e34] bg-[#111418]/95 shadow-[inset_0_1px_rgba(255,255,255,.035),0_12px_50px_rgba(0,0,0,.13)]";
+const card = "rounded-xl border border-[#322a2a] bg-[#141111]/95 shadow-[inset_0_1px_rgba(255,255,255,.035),0_12px_50px_rgba(0,0,0,.13)]";
 const label = "text-[10px] font-semibold uppercase tracking-[.15em] text-[#6f7a84]";
-const input = "h-11 w-full rounded-lg border border-[#303840] bg-[#0c0f12] px-3 text-sm text-[#edf2f5] outline-none transition focus:border-[#528cad] focus:ring-2 focus:ring-[#528cad]/15";
-const primaryButton = "inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-[#dbe8ef] px-5 text-sm font-semibold text-[#10161a] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40";
-const secondaryButton = "inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-[#303840] bg-[#15191d] px-4 text-xs font-medium text-[#c2cbd1] transition hover:border-[#46515a] hover:bg-[#1a2025]";
+const input = "h-11 w-full rounded-lg border border-[#433637] bg-[#0d0b0b] px-3 text-sm text-[#edf2f5] outline-none transition focus:border-[#d93a3e] focus:ring-2 focus:ring-[#d93a3e]/15";
+const primaryButton = "inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-[#f4f0ed] px-5 text-sm font-semibold text-[#171010] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40";
+const secondaryButton = "inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-[#433637] bg-[#1a1515] px-4 text-xs font-medium text-[#c2cbd1] transition hover:border-[#68474a] hover:bg-[#1a2025]";
 
 type ScaleCartLine = {
   key: string;
@@ -259,7 +259,7 @@ export function PosCheckoutScreen() {
     <>
       <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className={`${label} mb-2 text-[#719bb2]`}>POS / live checkout</p>
+          <p className={`${label} mb-2 text-[#ef5b5e]`}>POS / live checkout</p>
           <h1 className="text-2xl font-semibold tracking-tight sm:text-[30px]">Scan & checkout</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[#818c95]">Scan Teraoka meat labels, normal retail barcodes, or add a reserved butcher ticket. The scanner behaves like a keyboard and submits with Enter.</p>
         </div>
@@ -280,16 +280,16 @@ export function PosCheckoutScreen() {
         onSubmit={(event) => { event.preventDefault(); processScan(scanValue); }}
       >
         <div className="flex flex-col gap-3 md:flex-row md:items-center">
-          <div className="grid size-12 shrink-0 place-items-center rounded-xl bg-[#18303c] text-[#82c4e5]"><ScanLine size={25} /></div>
+          <div className="grid size-12 shrink-0 place-items-center rounded-xl bg-[#2a1618] text-[#ff8d8f]"><ScanLine size={25} /></div>
           <div className="min-w-0 flex-1">
             <label className="mb-2 block text-xs font-semibold text-[#b9c6cd]" htmlFor="pos-barcode">Scanner input</label>
             <div className="relative">
-              <Barcode className="pointer-events-none absolute left-3 top-3.5 text-[#62869a]" size={18} />
+              <Barcode className="pointer-events-none absolute left-3 top-3.5 text-[#a64a4e]" size={18} />
               <input
                 ref={scanRef}
                 autoFocus
                 autoComplete="off"
-                className="h-12 w-full rounded-lg border border-[#426a80] bg-[#080b0d] pl-11 pr-4 font-mono text-base tracking-[.08em] text-white outline-none focus:border-[#76b5d7] focus:ring-2 focus:ring-[#528cad]/20"
+                className="h-12 w-full rounded-lg border border-[#743236] bg-[#080b0d] pl-11 pr-4 font-mono text-base tracking-[.08em] text-white outline-none focus:border-[#f06a6d] focus:ring-2 focus:ring-[#d93a3e]/20"
                 id="pos-barcode"
                 inputMode="numeric"
                 placeholder="Scan barcode or enter BT-10482, then press Enter"
@@ -310,25 +310,25 @@ export function PosCheckoutScreen() {
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2 text-[10px] text-[#6f7a84]">
           <span className="mr-1 uppercase tracking-wider">Try demo</span>
-          <button className="rounded-full border border-[#34404a] px-3 py-1.5 hover:text-white" type="button" onClick={() => processScan("2044442153356")}>Rump scale label</button>
-          <button className="rounded-full border border-[#34404a] px-3 py-1.5 hover:text-white" type="button" onClick={() => processScan("5449000000996")}>Coke can</button>
+          <button className="rounded-full border border-[#4c3a3c] px-3 py-1.5 hover:text-white" type="button" onClick={() => processScan("2044442153356")}>Rump scale label</button>
+          <button className="rounded-full border border-[#4c3a3c] px-3 py-1.5 hover:text-white" type="button" onClick={() => processScan("5449000000996")}>Coke can</button>
           <span className="ml-auto hidden sm:inline">Active mask: {selectedScaleFormat?.label}</span>
         </div>
       </form>
 
       {showScaleSetup && (
         <div className={`${card} mb-4 p-5`}>
-          <div className="flex flex-col gap-4 border-b border-[#272e34] pb-5 md:flex-row md:items-end md:justify-between">
+          <div className="flex flex-col gap-4 border-b border-[#322a2a] pb-5 md:flex-row md:items-end md:justify-between">
             <div><h2 className="text-sm font-semibold">Teraoka scale setup</h2><p className="mt-1 text-xs leading-5 text-[#77838c]">Choose the barcode mask printed by your scale and match each scale PLU to a Cooler product.</p></div>
             <label className="block min-w-72"><span className="mb-2 block text-xs text-[#9ca6ad]">Price barcode mask</span><select className={input} value={scaleFormatId} onChange={(event) => setScaleFormatId(event.target.value)}>{scaleFormats.map((format) => <option key={format.id} value={format.id}>{format.label}</option>)}</select></label>
           </div>
           <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {inventory.filter((item) => item.price > 0).map((item) => (
-              <label key={item.id} className="flex items-center gap-3 rounded-lg border border-[#293139] bg-[#0d1013] p-3">
+              <label key={item.id} className="flex items-center gap-3 rounded-lg border border-[#293139] bg-[#100d0d] p-3">
                 <span className="min-w-0 flex-1 truncate text-xs font-medium">{item.product}</span>
                 <input
                   aria-label={`${item.product} scale PLU`}
-                  className="h-9 w-20 rounded-md border border-[#34404a] bg-[#080b0d] px-2 text-right font-mono text-xs outline-none focus:border-[#598da9]"
+                  className="h-9 w-20 rounded-md border border-[#4c3a3c] bg-[#080b0d] px-2 text-right font-mono text-xs outline-none focus:border-[#8c3a3e]"
                   defaultValue={item.scalePlu}
                   inputMode="numeric"
                   maxLength={5}
@@ -358,31 +358,31 @@ export function PosCheckoutScreen() {
       <div className="grid gap-4 2xl:grid-cols-[1fr_420px]">
         <div className="space-y-4">
           <div className={`${card} overflow-hidden`}>
-            <div className="flex items-center justify-between border-b border-[#272e34] p-5">
+            <div className="flex items-center justify-between border-b border-[#322a2a] p-5">
               <div><h2 className="text-sm font-semibold">Current basket</h2><p className="mt-1 text-xs text-[#6f7a84]">{cart.length} line{cart.length === 1 ? "" : "s"} · {kg(totalKg)} · {totalUnits} retail unit{totalUnits === 1 ? "" : "s"}</p></div>
               {cart.length > 0 && <button className="text-xs text-[#d4777e] hover:text-[#f0959c]" onClick={() => setCart([])}>Clear basket</button>}
             </div>
             {cart.length === 0 ? (
               <div className="flex min-h-64 flex-col items-center justify-center p-8 text-center">
-                <div className="grid size-14 place-items-center rounded-xl border border-[#344651] bg-[#14232c] text-[#79b5d4]"><ShoppingCart size={24} /></div>
+                <div className="grid size-14 place-items-center rounded-xl border border-[#603236] bg-[#241416] text-[#f06a6d]"><ShoppingCart size={24} /></div>
                 <h3 className="mt-4 text-sm font-semibold">Ready for the first scan</h3>
                 <p className="mt-2 max-w-sm text-xs leading-5 text-[#77838c]">The scanner will identify a weighted meat label, retail barcode, or butcher ticket and add it here.</p>
               </div>
             ) : (
-              <div className="divide-y divide-[#252c32]">
+              <div className="divide-y divide-[#312929]">
                 {cart.map((line) => (
                   <div key={line.key} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:p-5">
-                    <div className={`grid size-10 shrink-0 place-items-center rounded-lg ${line.source === "scale" ? "bg-[#172f3b] text-[#7fc3e4]" : line.source === "ticket" ? "bg-[#2d2413] text-[#deb15b]" : "bg-[#173025] text-[#6fd09a]"}`}>
+                    <div className={`grid size-10 shrink-0 place-items-center rounded-lg ${line.source === "scale" ? "bg-[#291618] text-[#ff8d8f]" : line.source === "ticket" ? "bg-[#2d2413] text-[#deb15b]" : "bg-[#173025] text-[#6fd09a]"}`}>
                       {line.source === "scale" ? <Barcode size={19} /> : line.source === "ticket" ? <PackageCheck size={19} /> : <ShoppingCart size={19} />}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2"><p className="text-sm font-semibold">{line.source === "ticket" ? line.ticket.number : line.source === "retail" ? line.product.name : line.product}</p><span className="rounded-full border border-[#34404a] px-2 py-0.5 text-[9px] uppercase tracking-wider text-[#7e8992]">{line.source}</span></div>
+                      <div className="flex flex-wrap items-center gap-2"><p className="text-sm font-semibold">{line.source === "ticket" ? line.ticket.number : line.source === "retail" ? line.product.name : line.product}</p><span className="rounded-full border border-[#4c3a3c] px-2 py-0.5 text-[9px] uppercase tracking-wider text-[#7e8992]">{line.source}</span></div>
                       {line.source === "scale" && <p className="mt-1 font-mono text-[10px] text-[#6f7a84]">{line.barcode} · {line.formatLabel}</p>}
                       {line.source === "ticket" && <p className="mt-1 text-xs text-[#78838c]">{line.ticket.customer} · {line.ticket.items.map((item) => item.product).join(", ")}</p>}
                       {line.source === "retail" && <p className="mt-1 font-mono text-[10px] text-[#6f7a84]">{line.product.barcode} · {line.product.stockUnits} in stock</p>}
                     </div>
                     {line.source === "retail" ? (
-                      <div className="flex items-center gap-1 rounded-lg border border-[#303840] bg-[#0c0f12] p-1">
+                      <div className="flex items-center gap-1 rounded-lg border border-[#433637] bg-[#0d0b0b] p-1">
                         <button aria-label={`Decrease ${line.product.name}`} className="grid size-8 place-items-center rounded-md hover:bg-[#1c2328]" onClick={() => changeRetailQuantity(line.key, -1)}><Minus size={14} /></button>
                         <span className="w-8 text-center font-mono text-sm font-semibold">{line.quantity}</span>
                         <button aria-label={`Increase ${line.product.name}`} className="grid size-8 place-items-center rounded-md hover:bg-[#1c2328]" onClick={() => changeRetailQuantity(line.key, 1)}><Plus size={14} /></button>
@@ -397,10 +397,10 @@ export function PosCheckoutScreen() {
           </div>
 
           <div className={`${card} overflow-hidden`}>
-            <div className="border-b border-[#272e34] p-5"><h2 className="text-sm font-semibold">Awaiting butcher tickets</h2><p className="mt-1 text-xs text-[#6f7a84]">Tap a ticket if its printed ticket barcode is unavailable.</p></div>
+            <div className="border-b border-[#322a2a] p-5"><h2 className="text-sm font-semibold">Awaiting butcher tickets</h2><p className="mt-1 text-xs text-[#6f7a84]">Tap a ticket if its printed ticket barcode is unavailable.</p></div>
             <div className="grid gap-2 p-4 md:grid-cols-2">
               {openTickets.map((ticket) => (
-                <button key={ticket.id} className="flex min-h-20 items-center gap-3 rounded-lg border border-[#293139] bg-[#0e1114] p-4 text-left hover:border-[#46515a]" onClick={() => addTicket(ticket)}>
+                <button key={ticket.id} className="flex min-h-20 items-center gap-3 rounded-lg border border-[#293139] bg-[#0e1114] p-4 text-left hover:border-[#68474a]" onClick={() => addTicket(ticket)}>
                   <div className="grid size-10 place-items-center rounded-lg bg-[#2d2413] font-mono text-xs font-semibold text-[#deb15b]">{ticket.number.slice(-3)}</div>
                   <div className="min-w-0 flex-1"><p className="font-mono text-xs font-semibold">{ticket.number}</p><p className="mt-1 truncate text-[10px] text-[#77838c]">{ticket.customer} · {kg(ticket.totalKg)}</p></div>
                   <p className="font-mono text-sm font-semibold">{zar.format(ticket.total)}</p>
@@ -411,25 +411,25 @@ export function PosCheckoutScreen() {
         </div>
 
         <aside className={`${card} h-fit overflow-hidden 2xl:sticky 2xl:top-[96px]`}>
-          <div className="border-b border-[#272e34] p-5">
-            <div className="flex items-center gap-3"><div className="grid size-10 place-items-center rounded-lg bg-[#18303c] text-[#82c4e5]"><CreditCard size={20} /></div><div><h2 className="text-sm font-semibold">Payment</h2><p className="mt-1 text-xs text-[#6f7a84]">Complete the sale and issue a receipt</p></div></div>
+          <div className="border-b border-[#322a2a] p-5">
+            <div className="flex items-center gap-3"><div className="grid size-10 place-items-center rounded-lg bg-[#2a1618] text-[#ff8d8f]"><CreditCard size={20} /></div><div><h2 className="text-sm font-semibold">Payment</h2><p className="mt-1 text-xs text-[#6f7a84]">Complete the sale and issue a receipt</p></div></div>
           </div>
-          <div className="border-b border-[#272e34] p-5">
+          <div className="border-b border-[#322a2a] p-5">
             <label className="block"><span className="mb-2 block text-xs text-[#9ca6ad]">Customer</span><input className={input} value={customer} onChange={(event) => setCustomer(event.target.value)} /></label>
           </div>
           <div className="grid grid-cols-2 gap-2 p-4">
             {(["Card", "Cash", "EFT", "Customer account", "Split"] as PaymentMode[]).map((mode) => (
-              <button key={mode} className={`min-h-12 rounded-lg border px-3 text-xs font-semibold transition ${paymentMode === mode ? "border-[#4d7c94] bg-[#172b36] text-[#9bd0e9]" : "border-[#303840] bg-[#0e1114] text-[#8f9aa2] hover:text-white"} ${mode === "Split" ? "col-span-2" : ""}`} onClick={() => setPaymentMode(mode)}>{mode}</button>
+              <button key={mode} className={`min-h-12 rounded-lg border px-3 text-xs font-semibold transition ${paymentMode === mode ? "border-[#81383b] bg-[#2a1618] text-[#ff9fa1]" : "border-[#433637] bg-[#0e1114] text-[#8f9aa2] hover:text-white"} ${mode === "Split" ? "col-span-2" : ""}`} onClick={() => setPaymentMode(mode)}>{mode}</button>
             ))}
           </div>
           {paymentMode === "Cash" && (
-            <div className="border-t border-[#272e34] p-5">
+            <div className="border-t border-[#322a2a] p-5">
               <label><span className="mb-2 block text-xs text-[#9ca6ad]">Cash tendered</span><input className={`${input} text-right font-mono text-lg font-semibold`} inputMode="decimal" placeholder="0.00" value={cashTender} onChange={(event) => setCashTender(event.target.value)} /></label>
               <div className="mt-3 flex justify-between text-xs"><span className="text-[#77838c]">Change</span><strong className="font-mono text-[#6bd09a]">{zar.format(cashChange)}</strong></div>
             </div>
           )}
           {paymentMode === "Split" && (
-            <div className="space-y-3 border-t border-[#272e34] p-5">
+            <div className="space-y-3 border-t border-[#322a2a] p-5">
               {[
                 ["Cash", splitCash, setSplitCash],
                 ["Card", splitCard, setSplitCard],
@@ -437,11 +437,11 @@ export function PosCheckoutScreen() {
               ].map(([name, value, setter]) => (
                 <label className="grid grid-cols-[70px_1fr] items-center gap-3" key={String(name)}><span className="text-xs text-[#9ca6ad]">{String(name)}</span><input className={`${input} text-right font-mono`} inputMode="decimal" placeholder="0.00" value={String(value)} onChange={(event) => (setter as React.Dispatch<React.SetStateAction<string>>)(event.target.value)} /></label>
               ))}
-              <div className="flex justify-between border-t border-[#272e34] pt-3 text-xs"><span className="text-[#77838c]">{splitDifference < 0 ? "Still due" : "Difference"}</span><strong className={`font-mono ${Math.abs(splitDifference) < .001 ? "text-[#6bd09a]" : "text-[#e2ae55]"}`}>{zar.format(Math.abs(splitDifference))}</strong></div>
+              <div className="flex justify-between border-t border-[#322a2a] pt-3 text-xs"><span className="text-[#77838c]">{splitDifference < 0 ? "Still due" : "Difference"}</span><strong className={`font-mono ${Math.abs(splitDifference) < .001 ? "text-[#6bd09a]" : "text-[#e2ae55]"}`}>{zar.format(Math.abs(splitDifference))}</strong></div>
             </div>
           )}
-          <div className="border-t border-[#272e34] bg-[#0c0f12] p-5">
-            <div className="mb-5 flex items-end justify-between"><div><p className={label}>Basket</p><p className="mt-2 text-xs text-[#78838c]">{kg(totalKg)} · {totalUnits} units</p></div><div className="text-right"><p className={label}>Total due</p><p className="mt-2 font-mono text-3xl font-semibold tracking-tight text-[#8bc4e0]">{zar.format(roundedTotal)}</p></div></div>
+          <div className="border-t border-[#322a2a] bg-[#0d0b0b] p-5">
+            <div className="mb-5 flex items-end justify-between"><div><p className={label}>Basket</p><p className="mt-2 text-xs text-[#78838c]">{kg(totalKg)} · {totalUnits} units</p></div><div className="text-right"><p className={label}>Total due</p><p className="mt-2 font-mono text-3xl font-semibold tracking-tight text-[#ff8a8c]">{zar.format(roundedTotal)}</p></div></div>
             <button className={`${primaryButton} w-full`} disabled={!canPay} onClick={handlePayment}>{paymentMode === "Cash" ? <Banknote size={18} /> : <CreditCard size={18} />} Complete {paymentMode.toLowerCase()} payment</button>
             <p className="mt-3 text-center text-[10px] leading-4 text-[#657079]">Payment posts the sale, moves reserved meat to sold, and reduces unit stock.</p>
           </div>
@@ -459,11 +459,11 @@ function ReceiptView({ sale, onNewSale }: { sale: SaleRecord; onNewSale: () => v
         <div className="flex gap-2"><button className={secondaryButton} onClick={() => window.print()}><Printer size={15} /> Print receipt</button><button className={primaryButton} onClick={onNewSale}><Plus size={16} /> New sale</button></div>
       </div>
       <div className={`${card} overflow-hidden`}>
-        <div className="flex items-center gap-4 border-b border-[#272e34] p-6"><div className="grid size-12 place-items-center rounded-full bg-[#153524] text-[#6bd09a]"><Check size={24} /></div><div><h2 className="font-semibold">Sale successfully posted</h2><p className="mt-1 text-xs text-[#77838c]">{sale.customer} · Cashier {sale.cashier}</p></div><p className="ml-auto font-mono text-2xl font-semibold">{zar.format(sale.revenue)}</p></div>
-        <div className="divide-y divide-[#252c32]">
+        <div className="flex items-center gap-4 border-b border-[#322a2a] p-6"><div className="grid size-12 place-items-center rounded-full bg-[#153524] text-[#6bd09a]"><Check size={24} /></div><div><h2 className="font-semibold">Sale successfully posted</h2><p className="mt-1 text-xs text-[#77838c]">{sale.customer} · Cashier {sale.cashier}</p></div><p className="ml-auto font-mono text-2xl font-semibold">{zar.format(sale.revenue)}</p></div>
+        <div className="divide-y divide-[#312929]">
           {sale.items.map((item) => <div className="grid grid-cols-[1fr_auto] gap-4 px-6 py-4 text-xs" key={item.id}><div><p className="font-semibold">{item.product}</p><p className="mt-1 text-[10px] text-[#6f7a84]">{item.ticketNumber ? `${item.ticketNumber} · ` : ""}{item.weightKg ? `${item.weightKg.toFixed(3)} kg @ ${zar.format(item.unitPrice)}/kg` : `${item.quantity} × ${zar.format(item.unitPrice)}`}</p></div><p className="font-mono font-semibold">{zar.format(item.lineTotal)}</p></div>)}
         </div>
-        <div className="grid gap-4 border-t border-[#272e34] bg-[#0c0f12] p-6 sm:grid-cols-3">
+        <div className="grid gap-4 border-t border-[#322a2a] bg-[#0d0b0b] p-6 sm:grid-cols-3">
           <ReceiptMetric labelText="Payment" value={sale.payments.map((payment) => payment.method).join(" + ")} />
           <ReceiptMetric labelText="Total weight" value={kg(sale.totalKg)} />
           <ReceiptMetric labelText="Gross margin" value={`${sale.grossMargin.toFixed(2)}%`} />
