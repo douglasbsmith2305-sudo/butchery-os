@@ -9,17 +9,17 @@ import Link from "next/link";
 import { type ButcherTicket, type TicketStatus, useOperations } from "@/components/operations-store";
 import { kg, zar } from "@/lib/utils";
 
-const card = "rounded-xl border border-[#272e34] bg-[#111418]/95 shadow-[inset_0_1px_rgba(255,255,255,.035),0_12px_50px_rgba(0,0,0,.13)]";
+const card = "rounded-xl border border-[#322a2a] bg-[#141111]/95 shadow-[inset_0_1px_rgba(255,255,255,.035),0_12px_50px_rgba(0,0,0,.13)]";
 const label = "text-[10px] font-semibold uppercase tracking-[.15em] text-[#6f7a84]";
-const input = "h-11 w-full rounded-lg border border-[#303840] bg-[#0c0f12] px-3 text-sm text-[#edf2f5] outline-none transition focus:border-[#528cad] focus:ring-2 focus:ring-[#528cad]/15";
-const button = "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#dbe8ef] px-4 text-sm font-semibold text-[#10161a] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40";
-const secondaryButton = "inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-[#303840] bg-[#15191d] px-4 text-xs font-medium text-[#c2cbd1] transition hover:border-[#46515a] hover:bg-[#1a2025]";
+const input = "h-11 w-full rounded-lg border border-[#433637] bg-[#0d0b0b] px-3 text-sm text-[#edf2f5] outline-none transition focus:border-[#d93a3e] focus:ring-2 focus:ring-[#d93a3e]/15";
+const button = "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#f4f0ed] px-4 text-sm font-semibold text-[#171010] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40";
+const secondaryButton = "inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-[#433637] bg-[#1a1515] px-4 text-xs font-medium text-[#c2cbd1] transition hover:border-[#68474a] hover:bg-[#1a2025]";
 
 function Header({ eyebrow, title, description, action }: { eyebrow: string; title: string; description: string; action?: React.ReactNode }) {
   return (
     <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <p className={`${label} mb-2 text-[#719bb2]`}>{eyebrow}</p>
+        <p className={`${label} mb-2 text-[#ef5b5e]`}>{eyebrow}</p>
         <h1 className="text-2xl font-semibold tracking-tight sm:text-[30px]">{title}</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-[#818c95]">{description}</p>
       </div>
@@ -30,7 +30,7 @@ function Header({ eyebrow, title, description, action }: { eyebrow: string; titl
 
 function StatusBadge({ status }: { status: TicketStatus }) {
   const tones: Record<TicketStatus, string> = {
-    Open: "border-[#31546a] bg-[#132735] text-[#79b9dc]",
+    Open: "border-[#713033] bg-[#2a1517] text-[#ff7779]",
     "Awaiting payment": "border-[#5f4820] bg-[#2c210d] text-[#e0aa4b]",
     Paid: "border-[#28533e] bg-[#10291f] text-[#5fc78f]",
     Cancelled: "border-[#613037] bg-[#2f1519] text-[#e87980]",
@@ -109,9 +109,9 @@ export function NewTicketScreen() {
 
       <div className="grid gap-4 xl:grid-cols-[1.15fr_.85fr]">
         <div className={`${card} overflow-hidden`}>
-          <div className="flex flex-col gap-3 border-b border-[#272e34] p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 border-b border-[#322a2a] p-5 sm:flex-row sm:items-center sm:justify-between">
             <div><h2 className="text-sm font-semibold">Available products</h2><p className="mt-1 text-xs text-[#6f7a84]">Tap a product once to add it to the ticket.</p></div>
-            <label className="flex h-10 items-center gap-2 rounded-lg border border-[#303840] bg-[#0c0f12] px-3">
+            <label className="flex h-10 items-center gap-2 rounded-lg border border-[#433637] bg-[#0d0b0b] px-3">
               <Search size={15} className="text-[#6f7a84]" />
               <span className="sr-only">Search products</span>
               <input className="w-48 bg-transparent text-xs outline-none placeholder:text-[#66717a]" placeholder="Find a product…" value={query} onChange={(event) => setQuery(event.target.value)} />
@@ -136,21 +136,21 @@ export function NewTicketScreen() {
         </div>
 
         <div className={`${card} h-fit overflow-hidden xl:sticky xl:top-[96px]`}>
-          <div className="flex items-center gap-3 border-b border-[#272e34] p-5">
-            <div className="grid size-10 place-items-center rounded-lg bg-[#17252e] text-[#7ab4d2]"><ShoppingBasket size={20} /></div>
+          <div className="flex items-center gap-3 border-b border-[#322a2a] p-5">
+            <div className="grid size-10 place-items-center rounded-lg bg-[#281618] text-[#f06a6d]"><ShoppingBasket size={20} /></div>
             <div className="flex-1"><h2 className="text-sm font-semibold">Current ticket</h2><p className="mt-1 text-xs text-[#6f7a84]">{cart.length} product{cart.length === 1 ? "" : "s"} selected</p></div>
           </div>
-          <div className="grid gap-4 border-b border-[#272e34] p-5 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+          <div className="grid gap-4 border-b border-[#322a2a] p-5 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
             <FormField fieldLabel="Customer"><input className={input} value={customer} onChange={(event) => setCustomer(event.target.value)} placeholder="Walk-in or customer name" /></FormField>
             <FormField fieldLabel="Butcher"><select className={input} value={butcher} onChange={(event) => setButcher(event.target.value)}><option>Johan van Wyk</option><option>Lerato Molefe</option><option>Samkelo Dlamini</option></select></FormField>
           </div>
           <div className="max-h-[430px] space-y-2 overflow-y-auto p-4">
             {cartDetails.length === 0 ? (
               <div className="flex min-h-40 flex-col items-center justify-center text-center">
-                <Scale size={28} className="text-[#46515a]" /><p className="mt-3 text-sm font-medium text-[#939da5]">No meat added yet</p><p className="mt-1 max-w-52 text-xs leading-5 text-[#657079]">Choose a product, then enter the physical scale weight.</p>
+                <Scale size={28} className="text-[#68474a]" /><p className="mt-3 text-sm font-medium text-[#939da5]">No meat added yet</p><p className="mt-1 max-w-52 text-xs leading-5 text-[#657079]">Choose a product, then enter the physical scale weight.</p>
               </div>
             ) : cartDetails.map((item) => (
-              <div key={item.productId} className="rounded-lg border border-[#293139] bg-[#0c0f12] p-3">
+              <div key={item.productId} className="rounded-lg border border-[#293139] bg-[#0d0b0b] p-3">
                 <div className="flex items-center justify-between gap-3"><div><p className="text-xs font-semibold">{item.stock?.product}</p><p className="mt-1 text-[10px] text-[#6f7a84]">{zar.format(item.stock?.price ?? 0)} / kg · {item.availableKg.toFixed(2)} kg available</p></div><button aria-label={`Remove ${item.stock?.product}`} className="grid size-8 place-items-center rounded-md text-[#7e8992] hover:bg-[#29171a] hover:text-[#e87980]" onClick={() => removeProduct(item.productId)}><Trash2 size={15} /></button></div>
                 <div className="mt-3 grid grid-cols-[1fr_auto] gap-3">
                   <label><span className="sr-only">{item.stock?.product} weight in kg</span><div className="relative"><input aria-label={`${item.stock?.product} weight in kg`} className={`${input} pr-10 text-right font-mono text-base font-semibold`} inputMode="decimal" max={item.availableKg} min=".001" step=".001" type="number" value={item.weight} onChange={(event) => updateWeight(item.productId, event.target.value)} placeholder="0.000" /><span className="pointer-events-none absolute right-3 top-3.5 text-[10px] text-[#6f7a84]">kg</span></div></label>
@@ -160,8 +160,8 @@ export function NewTicketScreen() {
               </div>
             ))}
           </div>
-          <div className="border-t border-[#272e34] bg-[#0d1013] p-5">
-            <div className="mb-4 flex items-end justify-between"><div><p className={label}>Reserved weight</p><p className="mt-2 font-mono text-lg font-semibold">{kg(totalKg)}</p></div><div className="text-right"><p className={label}>Ticket total</p><p className="mt-2 font-mono text-2xl font-semibold text-[#8bc4e0]">{zar.format(total)}</p></div></div>
+          <div className="border-t border-[#322a2a] bg-[#100d0d] p-5">
+            <div className="mb-4 flex items-end justify-between"><div><p className={label}>Reserved weight</p><p className="mt-2 font-mono text-lg font-semibold">{kg(totalKg)}</p></div><div className="text-right"><p className={label}>Ticket total</p><p className="mt-2 font-mono text-2xl font-semibold text-[#ff8a8c]">{zar.format(total)}</p></div></div>
             <button className={`${button} w-full`} disabled={cart.length === 0 || hasInvalidLine} onClick={handleCreateTicket}><PackageCheck size={17} /> Create & reserve ticket</button>
             <p className="mt-3 text-center text-[10px] leading-4 text-[#657079]">No payment is taken here. POS will convert reserved stock to sold stock later.</p>
           </div>
@@ -202,16 +202,16 @@ export function OpenTicketsScreen() {
           return (
             <article key={ticket.id} className={`${card} overflow-hidden`}>
               <button className="flex w-full flex-col gap-4 p-5 text-left sm:flex-row sm:items-center" onClick={() => setExpandedId(expanded ? null : ticket.id)}>
-                <div className="flex items-center gap-3 sm:w-56"><div className="grid size-10 place-items-center rounded-lg bg-[#17252e] font-mono text-xs font-semibold text-[#8dbbd3]">{ticket.number.slice(-3)}</div><div><p className="font-mono text-sm font-semibold">{ticket.number}</p><p className="mt-1 text-[10px] text-[#6f7a84]">{formatDate(ticket.createdAt)}</p></div></div>
+                <div className="flex items-center gap-3 sm:w-56"><div className="grid size-10 place-items-center rounded-lg bg-[#281618] font-mono text-xs font-semibold text-[#8dbbd3]">{ticket.number.slice(-3)}</div><div><p className="font-mono text-sm font-semibold">{ticket.number}</p><p className="mt-1 text-[10px] text-[#6f7a84]">{formatDate(ticket.createdAt)}</p></div></div>
                 <div className="flex-1"><p className="text-sm font-medium">{ticket.customer}</p><p className="mt-1 text-xs text-[#6f7a84]">{ticket.butcher} · {ticket.items.length} item{ticket.items.length === 1 ? "" : "s"}</p></div>
                 <div className="flex items-center gap-6"><div className="text-right"><p className="font-mono text-sm font-semibold">{kg(ticket.totalKg)}</p><p className="mt-1 font-mono text-xs text-[#87b8d0]">{zar.format(ticket.total)}</p></div><StatusBadge status={ticket.status} />{expanded ? <ChevronUp size={17} className="text-[#7c8790]" /> : <ChevronDown size={17} className="text-[#7c8790]" />}</div>
               </button>
               {expanded && (
-                <div className="border-t border-[#272e34] bg-[#0d1013] p-5">
+                <div className="border-t border-[#322a2a] bg-[#100d0d] p-5">
                   <div className="grid gap-2">
-                    {ticket.items.map((item) => <div key={item.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-5 rounded-lg border border-[#252c32] bg-[#111418] px-4 py-3 text-xs"><div><p className="font-semibold">{item.product}</p><p className="mt-1 text-[10px] text-[#6f7a84]">{zar.format(item.pricePerKg)} / kg</p></div><p className="font-mono font-semibold">{item.weightKg.toFixed(2)} kg</p><p className="w-24 text-right font-mono">{zar.format(item.lineTotal)}</p></div>)}
+                    {ticket.items.map((item) => <div key={item.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-5 rounded-lg border border-[#312929] bg-[#141111] px-4 py-3 text-xs"><div><p className="font-semibold">{item.product}</p><p className="mt-1 text-[10px] text-[#6f7a84]">{zar.format(item.pricePerKg)} / kg</p></div><p className="font-mono font-semibold">{item.weightKg.toFixed(2)} kg</p><p className="w-24 text-right font-mono">{zar.format(item.lineTotal)}</p></div>)}
                   </div>
-                  <div className="mt-4 flex flex-col gap-3 border-t border-[#252c32] pt-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="mt-4 flex flex-col gap-3 border-t border-[#312929] pt-4 sm:flex-row sm:items-center sm:justify-between">
                     <p className="flex items-center gap-2 text-xs text-[#7d8891]"><Clock3 size={14} className="text-[#d7a64f]" /> Reserved until cashier completes payment</p>
                     {cancellingId === ticket.id ? (
                       <div className="flex flex-col gap-2 sm:flex-row">
@@ -249,11 +249,11 @@ export function RecentTicketsScreen() {
         <MiniMetric title="Cancelled weight" value={kg(cancelledKg)} detail="Returned to available stock" tone="amber" />
       </div>
       <div className={`${card} overflow-hidden`}>
-        <div className="flex flex-col gap-3 border-b border-[#272e34] p-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-3 border-b border-[#322a2a] p-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap gap-2">
-            {(["All", "Awaiting payment", "Paid", "Cancelled"] as const).map((option) => <button key={option} className={`rounded-full border px-3 py-2 text-[10px] font-semibold uppercase tracking-wider ${status === option ? "border-[#416b81] bg-[#172a35] text-[#8bc0dc]" : "border-[#303840] bg-[#111418] text-[#7c8790] hover:text-white"}`} onClick={() => setStatus(option)}>{option}</button>)}
+            {(["All", "Awaiting payment", "Paid", "Cancelled"] as const).map((option) => <button key={option} className={`rounded-full border px-3 py-2 text-[10px] font-semibold uppercase tracking-wider ${status === option ? "border-[#743236] bg-[#2b1719] text-[#ff8a8c]" : "border-[#433637] bg-[#141111] text-[#7c8790] hover:text-white"}`} onClick={() => setStatus(option)}>{option}</button>)}
           </div>
-          <label className="flex h-10 items-center gap-2 rounded-lg border border-[#303840] bg-[#0c0f12] px-3">
+          <label className="flex h-10 items-center gap-2 rounded-lg border border-[#433637] bg-[#0d0b0b] px-3">
             <Search size={15} className="text-[#6f7a84]" /><span className="sr-only">Search tickets</span>
             <input className="w-full bg-transparent text-xs outline-none placeholder:text-[#66717a] sm:w-64" placeholder="Ticket number or customer…" value={query} onChange={(event) => setQuery(event.target.value)} />
           </label>
@@ -261,12 +261,12 @@ export function RecentTicketsScreen() {
         {filtered.length === 0 ? <EmptyTickets title="No matching tickets" description="Try a different status or search term." /> : (
           <div className="scrollbar overflow-x-auto">
             <table className="w-full min-w-[850px] text-left">
-              <thead><tr className="border-b border-[#272e34] text-[10px] uppercase tracking-[.12em] text-[#69747d]">{["Ticket", "Created", "Customer", "Butcher", "Items", "Weight", "Total", "Status", ""].map((heading, index) => <th key={`${heading}-${index}`} className={`px-5 py-3 font-medium ${index >= 4 && index <= 6 ? "text-right" : ""}`}>{heading}</th>)}</tr></thead>
+              <thead><tr className="border-b border-[#322a2a] text-[10px] uppercase tracking-[.12em] text-[#69747d]">{["Ticket", "Created", "Customer", "Butcher", "Items", "Weight", "Total", "Status", ""].map((heading, index) => <th key={`${heading}-${index}`} className={`px-5 py-3 font-medium ${index >= 4 && index <= 6 ? "text-right" : ""}`}>{heading}</th>)}</tr></thead>
               <tbody>
                 {filtered.flatMap((ticket) => {
-                  const mainRow = <tr key={ticket.id} className="border-b border-[#20262b] text-xs hover:bg-[#151a1e]"><td className="px-5 py-4 font-mono font-semibold text-[#a7c8d9]">{ticket.number}</td><td className="px-5 py-4 text-[#7e8992]">{formatDate(ticket.createdAt)}</td><td className="px-5 py-4 font-medium">{ticket.customer}</td><td className="px-5 py-4 text-[#8b959d]">{ticket.butcher}</td><td className="px-5 py-4 text-right font-mono">{ticket.items.length}</td><td className="px-5 py-4 text-right font-mono">{ticket.totalKg.toFixed(2)} kg</td><td className="px-5 py-4 text-right font-mono font-semibold">{zar.format(ticket.total)}</td><td className="px-5 py-4"><StatusBadge status={ticket.status} /></td><td className="px-5 py-4"><button aria-label={`${expandedId === ticket.id ? "Hide" : "Show"} ${ticket.number} details`} className="grid size-8 place-items-center rounded-md border border-[#303840] text-[#89949d] hover:text-white" onClick={() => setExpandedId(expandedId === ticket.id ? null : ticket.id)}>{expandedId === ticket.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}</button></td></tr>;
+                  const mainRow = <tr key={ticket.id} className="border-b border-[#292222] text-xs hover:bg-[#1a1515]"><td className="px-5 py-4 font-mono font-semibold text-[#f0b2b4]">{ticket.number}</td><td className="px-5 py-4 text-[#7e8992]">{formatDate(ticket.createdAt)}</td><td className="px-5 py-4 font-medium">{ticket.customer}</td><td className="px-5 py-4 text-[#8b959d]">{ticket.butcher}</td><td className="px-5 py-4 text-right font-mono">{ticket.items.length}</td><td className="px-5 py-4 text-right font-mono">{ticket.totalKg.toFixed(2)} kg</td><td className="px-5 py-4 text-right font-mono font-semibold">{zar.format(ticket.total)}</td><td className="px-5 py-4"><StatusBadge status={ticket.status} /></td><td className="px-5 py-4"><button aria-label={`${expandedId === ticket.id ? "Hide" : "Show"} ${ticket.number} details`} className="grid size-8 place-items-center rounded-md border border-[#433637] text-[#89949d] hover:text-white" onClick={() => setExpandedId(expandedId === ticket.id ? null : ticket.id)}>{expandedId === ticket.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}</button></td></tr>;
                   if (expandedId !== ticket.id) return [mainRow];
-                  return [mainRow, <tr key={`${ticket.id}-detail`} className="border-b border-[#20262b] bg-[#0d1013]"><td colSpan={9} className="px-5 py-4"><div className="flex flex-wrap gap-2">{ticket.items.map((item) => <span key={item.id} className="rounded-md border border-[#293139] bg-[#14191d] px-3 py-2 text-xs"><strong>{item.product}</strong><span className="ml-2 font-mono text-[#82909a]">{item.weightKg.toFixed(2)} kg · {zar.format(item.lineTotal)}</span></span>)}</div>{ticket.cancellationReason && <p className="mt-3 text-xs text-[#d97980]">Cancellation reason: {ticket.cancellationReason}</p>}</td></tr>];
+                  return [mainRow, <tr key={`${ticket.id}-detail`} className="border-b border-[#292222] bg-[#100d0d]"><td colSpan={9} className="px-5 py-4"><div className="flex flex-wrap gap-2">{ticket.items.map((item) => <span key={item.id} className="rounded-md border border-[#293139] bg-[#14191d] px-3 py-2 text-xs"><strong>{item.product}</strong><span className="ml-2 font-mono text-[#82909a]">{item.weightKg.toFixed(2)} kg · {zar.format(item.lineTotal)}</span></span>)}</div>{ticket.cancellationReason && <p className="mt-3 text-xs text-[#d97980]">Cancellation reason: {ticket.cancellationReason}</p>}</td></tr>];
                 })}
               </tbody>
             </table>
@@ -282,7 +282,7 @@ function FormField({ fieldLabel, children }: { fieldLabel: string; children: Rea
 }
 
 function EmptyTickets({ title, description }: { title: string; description: string }) {
-  return <div className={`${card} flex min-h-72 flex-col items-center justify-center p-8 text-center`}><div className="grid size-14 place-items-center rounded-xl border border-[#344651] bg-[#14232c] text-[#79b5d4]"><ShoppingBasket size={24} /></div><h2 className="mt-4 text-base font-semibold">{title}</h2><p className="mt-2 text-sm text-[#7d8891]">{description}</p></div>;
+  return <div className={`${card} flex min-h-72 flex-col items-center justify-center p-8 text-center`}><div className="grid size-14 place-items-center rounded-xl border border-[#603236] bg-[#241416] text-[#f06a6d]"><ShoppingBasket size={24} /></div><h2 className="mt-4 text-base font-semibold">{title}</h2><p className="mt-2 text-sm text-[#7d8891]">{description}</p></div>;
 }
 
 function MiniMetric({ title, value, detail, tone = "neutral" }: { title: string; value: string; detail: string; tone?: "neutral" | "green" | "amber" }) {
