@@ -7,6 +7,7 @@ import {
   ClipboardList, CreditCard, Gauge, History, Menu, PackageCheck, Receipt,
   Scissors, Search, Settings, ShieldCheck, Store, Truck, Users, Warehouse,
   X, CircleDollarSign, Scale, TriangleAlert, UserRound,
+  FileSpreadsheet, ShoppingCart, Thermometer, LayoutDashboard,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,10 @@ const groups = [
     ["Batch profitability", "/management/batches", PackageCheck], ["Supplier performance", "/management/suppliers", Building2],
     ["Variances", "/management/variances", TriangleAlert], ["Reconciliation", "/management/reconciliation", ShieldCheck],
   ]},
+  { label: "Back Office", items: [
+    ["Overview", "/backoffice", LayoutDashboard], ["CSV import & export", "/backoffice/import", FileSpreadsheet],
+    ["Purchase orders", "/backoffice/purchases", ShoppingCart], ["Food safety", "/backoffice/food-safety", Thermometer],
+  ]},
   { label: "Settings", items: [
     ["Products & prices", "/settings/products", Settings], ["Block test profiles", "/settings/block-tests", ClipboardList],
     ["Suppliers", "/settings/suppliers", Truck], ["Users", "/settings/users", Users],
@@ -41,7 +46,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const isPos = pathname.startsWith("/pos");
-  const isManagement = pathname.startsWith("/management");
+  const isManagement = pathname.startsWith("/management") || pathname.startsWith("/backoffice") || pathname.startsWith("/settings");
   const initials = isPos ? "AK" : isManagement ? "LD" : "NM";
   const userName = isPos ? "Ayanda Khumalo" : isManagement ? "Lerato Dlamini" : "Naledi Mokoena";
   const role = isPos ? "Cashier" : isManagement ? "Manager" : "Warehouse";
