@@ -6,17 +6,17 @@ import { useOperations } from "@/components/operations-store";
 import { reconcileStockCount } from "@/lib/inventory";
 import { kg, zar } from "@/lib/utils";
 
-const card = "rounded-xl border border-[#272e34] bg-[#111418]/95 shadow-[inset_0_1px_rgba(255,255,255,.035),0_12px_50px_rgba(0,0,0,.13)]";
+const card = "rounded-xl border border-[#322a2a] bg-[#141111]/95 shadow-[inset_0_1px_rgba(255,255,255,.035),0_12px_50px_rgba(0,0,0,.13)]";
 const label = "text-[10px] font-semibold uppercase tracking-[.15em] text-[#6f7a84]";
-const input = "h-11 w-full rounded-lg border border-[#303840] bg-[#0c0f12] px-3 text-sm text-[#edf2f5] outline-none transition focus:border-[#528cad] focus:ring-2 focus:ring-[#528cad]/15";
-const button = "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#dbe8ef] px-4 text-sm font-semibold text-[#10161a] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40";
-const secondaryButton = "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[#303840] bg-[#15191d] px-4 text-sm font-medium text-[#c2cbd1] transition hover:border-[#46515a] hover:bg-[#1a2025]";
+const input = "h-11 w-full rounded-lg border border-[#433637] bg-[#0d0b0b] px-3 text-sm text-[#edf2f5] outline-none transition focus:border-[#d93a3e] focus:ring-2 focus:ring-[#d93a3e]/15";
+const button = "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#f4f0ed] px-4 text-sm font-semibold text-[#171010] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40";
+const secondaryButton = "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[#433637] bg-[#1a1515] px-4 text-sm font-medium text-[#c2cbd1] transition hover:border-[#68474a] hover:bg-[#1a2025]";
 
 function Header({ eyebrow, title, description, action }: { eyebrow: string; title: string; description: string; action?: React.ReactNode }) {
   return (
     <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <p className={`${label} mb-2 text-[#719bb2]`}>{eyebrow}</p>
+        <p className={`${label} mb-2 text-[#ef5b5e]`}>{eyebrow}</p>
         <h1 className="text-2xl font-semibold tracking-tight sm:text-[30px]">{title}</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-[#818c95]">{description}</p>
       </div>
@@ -30,7 +30,7 @@ function StatusBadge({ children, tone }: { children: React.ReactNode; tone: "gre
     green: "border-[#28533e] bg-[#10291f] text-[#5fc78f]",
     amber: "border-[#5f4820] bg-[#2c210d] text-[#e0aa4b]",
     red: "border-[#613037] bg-[#2f1519] text-[#e87980]",
-    blue: "border-[#31546a] bg-[#132735] text-[#79b9dc]",
+    blue: "border-[#713033] bg-[#2a1517] text-[#ff7779]",
   };
   return <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[.09em] ${tones[tone]}`}>{children}</span>;
 }
@@ -108,12 +108,12 @@ export function StockCountScreen() {
       )}
 
       <div className={`${card} overflow-hidden`}>
-        <div className="flex flex-col gap-3 border-b border-[#272e34] p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 border-b border-[#322a2a] p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-sm font-semibold">Count sheet</h2>
             <p className="mt-1 text-xs text-[#6f7a84]">Reserved stock is included in physical kg and cannot be counted below its reserved weight.</p>
           </div>
-          <label className="flex h-10 items-center gap-2 rounded-lg border border-[#303840] bg-[#0c0f12] px-3">
+          <label className="flex h-10 items-center gap-2 rounded-lg border border-[#433637] bg-[#0d0b0b] px-3">
             <Search size={15} className="text-[#6f7a84]" />
             <span className="sr-only">Search products</span>
             <input className="w-48 bg-transparent text-xs outline-none placeholder:text-[#66717a]" placeholder="Find product…" value={query} onChange={(event) => setQuery(event.target.value)} />
@@ -122,7 +122,7 @@ export function StockCountScreen() {
         <div className="scrollbar overflow-x-auto">
           <table className="w-full min-w-[900px] text-left">
             <thead>
-              <tr className="border-b border-[#272e34] text-[10px] uppercase tracking-[.12em] text-[#69747d]">
+              <tr className="border-b border-[#322a2a] text-[10px] uppercase tracking-[.12em] text-[#69747d]">
                 {["Product", "System kg", "Reserved kg", "Physical count kg", "Variance kg", "Reason for variance"].map((heading, index) => <th key={heading} className={`px-5 py-3 font-medium ${index > 0 && index < 5 ? "text-right" : ""}`}>{heading}</th>)}
               </tr>
             </thead>
@@ -132,14 +132,14 @@ export function StockCountScreen() {
                 const counted = raw === "" ? null : Number(raw);
                 const variance = counted === null || !Number.isFinite(counted) ? null : counted - item.physical;
                 return (
-                  <tr key={item.id} className="border-b border-[#20262b] text-xs last:border-0">
+                  <tr key={item.id} className="border-b border-[#292222] text-xs last:border-0">
                     <td className="px-5 py-3.5 font-semibold">{item.product}</td>
                     <td className="px-5 py-3.5 text-right font-mono">{item.physical.toFixed(2)}</td>
                     <td className="px-5 py-3.5 text-right font-mono text-[#e1aa4b]">{item.reserved.toFixed(2)}</td>
                     <td className="px-5 py-2 text-right">
                       <input
                         aria-label={`${item.product} physical count`}
-                        className="h-10 w-28 rounded-md border border-[#34404a] bg-[#0b0e10] px-2 text-right font-mono text-sm font-semibold outline-none focus:border-[#598da9]"
+                        className="h-10 w-28 rounded-md border border-[#4c3a3c] bg-[#0b0e10] px-2 text-right font-mono text-sm font-semibold outline-none focus:border-[#8c3a3e]"
                         inputMode="decimal"
                         min={item.reserved}
                         step=".001"
@@ -153,7 +153,7 @@ export function StockCountScreen() {
                     </td>
                     <td className="px-5 py-2">
                       {variance !== null && Math.abs(variance) >= 0.001 ? (
-                        <select aria-label={`${item.product} variance reason`} className="h-10 w-full min-w-48 rounded-md border border-[#34404a] bg-[#0b0e10] px-2 text-xs outline-none focus:border-[#598da9]" value={draft[item.id]?.reason ?? ""} onChange={(event) => updateDraft(item.id, { reason: event.target.value })}>
+                        <select aria-label={`${item.product} variance reason`} className="h-10 w-full min-w-48 rounded-md border border-[#4c3a3c] bg-[#0b0e10] px-2 text-xs outline-none focus:border-[#8c3a3e]" value={draft[item.id]?.reason ?? ""} onChange={(event) => updateDraft(item.id, { reason: event.target.value })}>
                           <option value="">Select reason…</option>
                           <option>Scale error</option><option>Unrecorded waste</option><option>Butcher variance</option>
                           <option>Processing error</option><option>Theft suspected</option><option>Admin correction</option><option>Unknown</option>
@@ -166,7 +166,7 @@ export function StockCountScreen() {
             </tbody>
           </table>
         </div>
-        <div className="flex flex-col gap-4 border-t border-[#272e34] bg-[#0d1013] p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-4 border-t border-[#322a2a] bg-[#100d0d] p-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3 text-xs leading-5 text-[#7e8992]">
             <ShieldCheck size={17} className="mt-0.5 shrink-0 text-[#6db6d9]" />
             <p>Submitting creates one stock count record and adjustment movements only for products whose weights differ.</p>
@@ -213,7 +213,7 @@ export function WasteScreen() {
       <Header eyebrow="Cooler / control" title="Waste control" description="Record damaged, spoiled, trimmed, or rejected meat immediately. Waste reduces physical stock and remains permanently traceable." />
       <div className="grid gap-4 xl:grid-cols-[.8fr_1.2fr]">
         <form className={`${card} h-fit p-5 sm:p-6`} onSubmit={handleSubmit}>
-          <div className="mb-6 flex items-center gap-3 border-b border-[#272e34] pb-5">
+          <div className="mb-6 flex items-center gap-3 border-b border-[#322a2a] pb-5">
             <div className="grid size-10 place-items-center rounded-lg bg-[#2d1c12] text-[#e0a455]"><TriangleAlert size={20} /></div>
             <div><h2 className="text-sm font-semibold">Record waste</h2><p className="mt-1 text-xs text-[#6f7a84]">Available stock only—reserved customer meat is protected.</p></div>
           </div>
@@ -223,7 +223,7 @@ export function WasteScreen() {
                 {eligible.map((item) => <option key={item.id} value={item.id}>{item.product}</option>)}
               </select>
             </FormField>
-            <div className="grid grid-cols-2 gap-3 rounded-lg border border-[#293139] bg-[#0c0f12] p-4">
+            <div className="grid grid-cols-2 gap-3 rounded-lg border border-[#293139] bg-[#0d0b0b] p-4">
               <div><p className={label}>Available</p><p className="mt-2 font-mono text-lg font-semibold text-[#67cc98]">{kg(availableKg)}</p></div>
               <div className="text-right"><p className={label}>Average cost</p><p className="mt-2 font-mono text-lg font-semibold">{zar.format(selected?.cost ?? 0)}</p></div>
             </div>
@@ -249,16 +249,16 @@ export function WasteScreen() {
         </form>
 
         <div className={`${card} overflow-hidden`}>
-          <div className="flex items-center justify-between border-b border-[#272e34] p-5">
+          <div className="flex items-center justify-between border-b border-[#322a2a] p-5">
             <div><h2 className="text-sm font-semibold">Waste register</h2><p className="mt-1 text-xs text-[#6f7a84]">Permanent stock and cost history</p></div>
             <StatusBadge tone="amber">{wasteToday.reduce((sum, item) => sum + item.weightKg, 0).toFixed(2)} kg today</StatusBadge>
           </div>
           <div className="scrollbar overflow-x-auto">
             <table className="w-full min-w-[720px] text-left">
-              <thead><tr className="border-b border-[#272e34] text-[10px] uppercase tracking-[.12em] text-[#69747d]">{["Reference", "Date", "Product", "Reason", "Weight", "Cost impact", "Recorded by"].map((heading, index) => <th key={heading} className={`px-5 py-3 font-medium ${index === 4 || index === 5 ? "text-right" : ""}`}>{heading}</th>)}</tr></thead>
+              <thead><tr className="border-b border-[#322a2a] text-[10px] uppercase tracking-[.12em] text-[#69747d]">{["Reference", "Date", "Product", "Reason", "Weight", "Cost impact", "Recorded by"].map((heading, index) => <th key={heading} className={`px-5 py-3 font-medium ${index === 4 || index === 5 ? "text-right" : ""}`}>{heading}</th>)}</tr></thead>
               <tbody>
                 {waste.map((item) => (
-                  <tr key={item.id} className="border-b border-[#20262b] text-xs last:border-0 hover:bg-[#151a1e]">
+                  <tr key={item.id} className="border-b border-[#292222] text-xs last:border-0 hover:bg-[#1a1515]">
                     <td className="px-5 py-4 font-mono text-[#9ba8b1]">{item.number}</td>
                     <td className="px-5 py-4 text-[#7e8992]">{formatDate(item.createdAt)}</td>
                     <td className="px-5 py-4 font-semibold">{item.product}</td>
@@ -283,7 +283,7 @@ function Summary({ name, value, detail, tone = "neutral" }: { name: string; valu
 }
 
 function FormField({ label: fieldLabel, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
-  return <label className="block"><span className="mb-2 flex items-center justify-between text-xs font-medium text-[#a4adb4]">{fieldLabel}{hint && <span className="text-[10px] font-normal text-[#688697]">{hint}</span>}</span>{children}</label>;
+  return <label className="block"><span className="mb-2 flex items-center justify-between text-xs font-medium text-[#a4adb4]">{fieldLabel}{hint && <span className="text-[10px] font-normal text-[#907a7b]">{hint}</span>}</span>{children}</label>;
 }
 
 function formatDate(value: string) {
