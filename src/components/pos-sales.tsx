@@ -7,10 +7,10 @@ import {
 import { type SaleRecord, useOperations } from "@/components/operations-store";
 import { kg, zar } from "@/lib/utils";
 
-const card = "rounded-xl border border-[#272e34] bg-[#111418]/95 shadow-[inset_0_1px_rgba(255,255,255,.035),0_12px_50px_rgba(0,0,0,.13)]";
+const card = "rounded-xl border border-[#322a2a] bg-[#141111]/95 shadow-[inset_0_1px_rgba(255,255,255,.035),0_12px_50px_rgba(0,0,0,.13)]";
 const label = "text-[10px] font-semibold uppercase tracking-[.15em] text-[#6f7a84]";
-const input = "h-11 w-full rounded-lg border border-[#303840] bg-[#0c0f12] px-3 text-sm text-[#edf2f5] outline-none transition focus:border-[#528cad] focus:ring-2 focus:ring-[#528cad]/15";
-const secondaryButton = "inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-[#303840] bg-[#15191d] px-4 text-xs font-medium text-[#c2cbd1] transition hover:border-[#46515a] hover:bg-[#1a2025]";
+const input = "h-11 w-full rounded-lg border border-[#433637] bg-[#0d0b0b] px-3 text-sm text-[#edf2f5] outline-none transition focus:border-[#d93a3e] focus:ring-2 focus:ring-[#d93a3e]/15";
+const secondaryButton = "inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-[#433637] bg-[#1a1515] px-4 text-xs font-medium text-[#c2cbd1] transition hover:border-[#68474a] hover:bg-[#1a2025]";
 
 export function PosSalesScreen() {
   const { sales, refundSale } = useOperations();
@@ -50,7 +50,7 @@ export function PosSalesScreen() {
   return (
     <>
       <div className="mb-7">
-        <p className={`${label} mb-2 text-[#719bb2]`}>POS / transaction history</p>
+        <p className={`${label} mb-2 text-[#ef5b5e]`}>POS / transaction history</p>
         <h1 className="text-2xl font-semibold tracking-tight sm:text-[30px]">Sales & refunds</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-[#818c95]">Review receipts, payment allocation, product mix, profit, and controlled full-sale refunds.</p>
       </div>
@@ -65,11 +65,11 @@ export function PosSalesScreen() {
       {message && <div className={`mb-4 flex gap-3 rounded-lg border p-4 text-sm ${message.type === "success" ? "border-[#28533e] bg-[#10291f] text-[#70d09d]" : "border-[#613037] bg-[#2f1519] text-[#e87980]"}`}>{message.type === "success" ? <Check size={17} /> : <CircleAlert size={17} />}<span>{message.text}</span></div>}
 
       <div className={`${card} overflow-hidden`}>
-        <div className="flex flex-col gap-3 border-b border-[#272e34] p-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-3 border-b border-[#322a2a] p-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex gap-2">
-            {(["All", "Completed", "Refunded"] as const).map((option) => <button key={option} className={`rounded-full border px-3 py-2 text-[10px] font-semibold uppercase tracking-wider ${status === option ? "border-[#416b81] bg-[#172a35] text-[#8bc0dc]" : "border-[#303840] bg-[#111418] text-[#7c8790]"}`} onClick={() => setStatus(option)}>{option}</button>)}
+            {(["All", "Completed", "Refunded"] as const).map((option) => <button key={option} className={`rounded-full border px-3 py-2 text-[10px] font-semibold uppercase tracking-wider ${status === option ? "border-[#743236] bg-[#2b1719] text-[#ff8a8c]" : "border-[#433637] bg-[#141111] text-[#7c8790]"}`} onClick={() => setStatus(option)}>{option}</button>)}
           </div>
-          <label className="flex h-10 items-center gap-2 rounded-lg border border-[#303840] bg-[#0c0f12] px-3">
+          <label className="flex h-10 items-center gap-2 rounded-lg border border-[#433637] bg-[#0d0b0b] px-3">
             <Search size={15} className="text-[#6f7a84]" /><span className="sr-only">Search sales</span>
             <input className="w-full bg-transparent text-xs outline-none placeholder:text-[#66717a] sm:w-64" placeholder="Sale, receipt, or customer…" value={query} onChange={(event) => setQuery(event.target.value)} />
           </label>
@@ -78,13 +78,13 @@ export function PosSalesScreen() {
         {filtered.length === 0 ? (
           <div className="flex min-h-64 flex-col items-center justify-center p-8 text-center"><CreditCard size={28} className="text-[#52616a]" /><p className="mt-3 text-sm font-semibold">No matching sales</p><p className="mt-2 text-xs text-[#77838c]">Try another filter or receipt number.</p></div>
         ) : (
-          <div className="divide-y divide-[#252c32]">
+          <div className="divide-y divide-[#312929]">
             {filtered.map((sale) => {
               const expanded = expandedId === sale.id;
               return (
                 <article key={sale.id}>
                   <button className="grid w-full gap-3 p-5 text-left sm:grid-cols-[150px_1fr_120px_130px_130px_30px] sm:items-center" onClick={() => setExpandedId(expanded ? null : sale.id)}>
-                    <div><p className="font-mono text-sm font-semibold text-[#a7c8d9]">{sale.number}</p><p className="mt-1 font-mono text-[10px] text-[#6f7a84]">{sale.receiptNumber}</p></div>
+                    <div><p className="font-mono text-sm font-semibold text-[#f0b2b4]">{sale.number}</p><p className="mt-1 font-mono text-[10px] text-[#6f7a84]">{sale.receiptNumber}</p></div>
                     <div><p className="text-sm font-medium">{sale.customer}</p><p className="mt-1 text-[10px] text-[#6f7a84]">{formatDate(sale.createdAt)} · {sale.cashier}</p></div>
                     <div className="sm:text-right"><p className="font-mono text-xs font-semibold">{kg(sale.totalKg)}</p><p className="mt-1 text-[10px] text-[#6f7a84]">{sale.totalUnits} units</p></div>
                     <p className="font-mono text-sm font-semibold sm:text-right">{zar.format(sale.revenue)}</p>
@@ -92,17 +92,17 @@ export function PosSalesScreen() {
                     {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                   </button>
                   {expanded && (
-                    <div className="border-t border-[#20262b] bg-[#0c0f12] p-5">
+                    <div className="border-t border-[#292222] bg-[#0d0b0b] p-5">
                       <div className="grid gap-2">
                         {sale.items.map((item) => (
-                          <div key={item.id} className="grid gap-2 rounded-lg border border-[#252c32] bg-[#111418] p-3 text-xs sm:grid-cols-[1fr_auto_auto] sm:items-center">
+                          <div key={item.id} className="grid gap-2 rounded-lg border border-[#312929] bg-[#141111] p-3 text-xs sm:grid-cols-[1fr_auto_auto] sm:items-center">
                             <div><p className="font-semibold">{item.product}</p><p className="mt-1 text-[10px] text-[#6f7a84]">{item.source === "retail" ? `${item.quantity} × ${zar.format(item.unitPrice)}` : `${item.weightKg?.toFixed(3)} kg @ ${zar.format(item.unitPrice)}/kg`}{item.ticketNumber ? ` · ${item.ticketNumber}` : ""}</p></div>
                             <p className="font-mono text-[#7f8a93]">Cost {zar.format(item.costOfGoods)}</p>
                             <p className="w-28 text-right font-mono font-semibold">{zar.format(item.lineTotal)}</p>
                           </div>
                         ))}
                       </div>
-                      <div className="mt-4 grid gap-3 border-t border-[#252c32] pt-4 md:grid-cols-[1fr_auto] md:items-end">
+                      <div className="mt-4 grid gap-3 border-t border-[#312929] pt-4 md:grid-cols-[1fr_auto] md:items-end">
                         <div className="flex flex-wrap gap-4 text-xs text-[#7d8891]">
                           <span>Paid: <strong className="text-[#bec7cd]">{sale.payments.map((payment) => `${payment.method} ${zar.format(payment.amount)}`).join(" + ")}</strong></span>
                           <span>Gross profit: <strong className="text-[#67d098]">{zar.format(sale.grossProfit)} ({sale.grossMargin.toFixed(2)}%)</strong></span>
@@ -131,7 +131,7 @@ export function PosSalesScreen() {
 }
 
 function Metric({ title, value, detail, tone = "neutral" }: { title: string; value: string; detail: string; tone?: "neutral" | "blue" | "green" }) {
-  const colors = { neutral: "text-white", blue: "text-[#8bc4e0]", green: "text-[#67d098]" };
+  const colors = { neutral: "text-white", blue: "text-[#ff8a8c]", green: "text-[#67d098]" };
   return <div className={`${card} p-4`}><p className={label}>{title}</p><p className={`mt-4 text-[24px] font-semibold tracking-[-.04em] ${colors[tone]}`}>{value}</p><p className="mt-2 text-[11px] text-[#69747e]">{detail}</p></div>;
 }
 
