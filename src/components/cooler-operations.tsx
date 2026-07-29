@@ -38,7 +38,7 @@ function supplierCode(name: string) {
 }
 
 export function ReceiveDeliveryScreen() {
-  const { receiveDelivery } = useOperations();
+  const { receiveDelivery, suppliers, blockTestProfiles } = useOperations();
   const [supplier, setSupplier] = useState("Karoo Prime Meats");
   const [invoice, setInvoice] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
@@ -54,10 +54,8 @@ export function ReceiveDeliveryScreen() {
     try { return calculateDeliveryVariance(Number(invoiceKg), Number(actualKg), Number(cost)); } catch { return null; }
   }, [invoiceKg, actualKg, cost]);
   const actual = Number(actualKg) || 0;
-  const projections = useMemo(() => [
-    ["Rump", 7], ["T-Bone", 8.5], ["Club Steak", 4], ["Fillet", 1.5], ["Steak", 17], ["Short Rib", 5.5],
-    ["Brisket", 5], ["Chuck", 8], ["Mince/Wors Meat", 18], ["Stew Beef", 5], ["Bone", 15], ["Fat/Waste", 5.5],
-  ].map(([product, percent]) => ({ product, percent: Number(percent), expected: actual * Number(percent) / 100 })), [actual]);
+  const activeProfile = blockTestProfiles.find((item) => item.active) ?? blockTestProfiles[0];
+  const projections = useMemo(() => (activeProfile?.lines ?? []).map(({ product, percent }) => ({ product, percent, expected: actual * percent / 100 })), [actual, activeProfile]);
 
   function submit() {
     try {
@@ -88,7 +86,7 @@ export function ReceiveDeliveryScreen() {
       <div className={`${card} p-5 sm:p-7`}>
         <div className="mb-6 flex items-center gap-3 border-b border-[#272e34] pb-5"><div className="grid size-10 place-items-center rounded-lg bg-[#17252e] text-[#7ab4d2]"><Truck size={20} /></div><div><h2 className="text-sm font-semibold">Supplier document and scale check</h2><p className="mt-1 text-xs text-[#6f7a84]">Required fields are retained on the batch trace</p></div></div>
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field name="Supplier"><select className={input} value={supplier} onChange={(event) => { setSupplier(event.target.value); setReviewed(false); }}><option>Karoo Prime Meats</option><option>Highveld Beef Co.</option><option>Lowveld Livestock</option></select></Field>
+          <Field name="Supplier"><select className={input} value={supplier} onChange={(event) => { setSupplier(event.target.value); setReviewed(false); }}>{suppliers.filter((item) => item.active).map((item) => <option key={item.id}>{item.name}</option>)}</select></Field>
           <Field name="Supplier invoice number"><input className={input} value={invoice} onChange={(event) => { setInvoice(event.target.value); setReviewed(false); }} placeholder={`${supplierCode(supplier)}-00000`} /></Field>
           <Field name="Delivery date"><input className={input} type="date" value={date} onChange={(event) => { setDate(event.target.value); setReviewed(false); }} /></Field>
           <Field name="Meat type"><select className={input} value={meatType} onChange={(event) => { setMeatType(event.target.value); setReviewed(false); }}><option>Raw Beef</option><option>Lamb</option><option>Pork</option></select></Field>
@@ -107,7 +105,7 @@ export function ReceiveDeliveryScreen() {
       </div>
       <div className={`${card} h-fit overflow-hidden`}>
         <div className="border-b border-[#272e34] p-5"><div className="flex items-center gap-3"><Sparkles size={18} className="text-[#76b5d7]" /><div><h2 className="text-sm font-semibold">Expected block test</h2><p className="mt-1 text-xs text-[#6f7a84]">Planning only — finished stock is created during processing</p></div></div></div>
-        <div className="grid grid-cols-3 border-b border-[#272e34]"><div className="p-4"><p className={label}>Raw input</p><p className="mt-2 font-mono text-xs font-semibold">{kg(actual)}</p></div><div className="border-x border-[#272e34] p-4"><p className={label}>Profile</p><p className="mt-2 text-xs font-semibold">Standard Beef</p></div><div className="p-4"><p className={label}>Total yield</p><p className="mt-2 font-mono text-xs font-semibold">100.00%</p></div></div>
+        <div className="grid grid-cols-3 border-b border-[#272e34]"><div className="p-4"><p className={label}>Raw input</p><p className="mt-2 font-mono text-xs font-semibold">{kg(actual)}</p></div><div className="border-x border-[#272e34] p-4"><p className={label}>Profile</p><p className="mt-2 text-xs font-semibold">{activeProfile?.name ?? "No active profile"}</p></div><div className="p-4"><p className={label}>Total yield</p><p className="mt-2 font-mono text-xs font-semibold">{(activeProfile?.lines.reduce((sum, item) => sum + item.percent, 0) ?? 0).toFixed(2)}%</p></div></div>
         <table className="w-full text-left text-xs"><thead><tr className="border-b border-[#272e34] text-[10px] uppercase tracking-wider text-[#69747e]"><th className="px-5 py-3">Product</th><th className="px-4 py-3 text-right">Yield</th><th className="px-5 py-3 text-right">Expected kg</th></tr></thead><tbody>{projections.map((row) => <tr key={String(row.product)} className="border-b border-[#21272c] last:border-0"><td className="px-5 py-2.5 font-medium">{row.product}</td><td className="px-4 py-2.5 text-right font-mono text-[#7c8790]">{row.percent.toFixed(1)}%</td><td className="px-5 py-2.5 text-right font-mono font-semibold">{row.expected.toFixed(3)}</td></tr>)}</tbody></table>
       </div>
     </div>
