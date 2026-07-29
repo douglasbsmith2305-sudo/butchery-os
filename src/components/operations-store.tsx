@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { calculateDeliveryVariance, nextBatchCode, processingStatus, validateBatchProcessing, weightedAverageCost } from "@/lib/cooler";
+import { booleanFromCsv, type CsvRow, type ImportDataset, type ImportMode } from "@/lib/csv";
 import { inventory as seedInventory, profile } from "@/lib/demo-data";
 import { assertCanConsume, cancelReservation, recordWaste as calculateWaste, reconcileStockCount, reserveStock } from "@/lib/inventory";
 import { normalizePlu, paymentDifference } from "@/lib/pos";
@@ -15,6 +16,9 @@ export type InventoryItem = {
   price: number;
   movement: string;
   scalePlu: string;
+  category: string;
+  reorderLevelKg: number;
+  active: boolean;
 };
 
 export type TicketStatus = "Open" | "Awaiting payment" | "Paid" | "Cancelled" | "Returned";
@@ -86,6 +90,73 @@ export type RetailProduct = {
   cost: number;
   stockUnits: number;
   category: string;
+  reorderLevelUnits: number;
+  active: boolean;
+};
+
+export type Supplier = {
+  id: string;
+  code: string;
+  name: string;
+  contactPerson: string;
+  phone: string;
+  email: string;
+  paymentTermsDays: number;
+  active: boolean;
+};
+
+export type PurchaseOrder = {
+  id: string;
+  number: string;
+  supplierId: string;
+  supplier: string;
+  deliveryDate: string;
+  status: "Draft" | "Ordered" | "Received" | "Cancelled";
+  lines: { id: string; description: string; orderedKg: number; costPerKg: number }[];
+  subtotal: number;
+  notes?: string;
+  createdBy: string;
+  createdAt: string;
+};
+
+export type BlockTestProfile = {
+  id: string;
+  name: string;
+  active: boolean;
+  lines: { productId: string; product: string; percent: number }[];
+  updatedAt: string;
+};
+
+export type StaffUser = {
+  id: string;
+  name: string;
+  role: "Manager" | "Warehouse" | "Butcher" | "Cashier";
+  active: boolean;
+};
+
+export type FoodSafetyCheck = {
+  id: string;
+  number: string;
+  area: string;
+  temperatureC: number;
+  maximumC: number;
+  status: "Pass" | "Action required";
+  correctiveAction?: string;
+  recordedBy: string;
+  createdAt: string;
+};
+
+export type ImportBatch = {
+  id: string;
+  number: string;
+  dataset: ImportDataset;
+  filename: string;
+  rowCount: number;
+  createdCount: number;
+  updatedCount: number;
+  skippedCount: number;
+  importedBy: string;
+  createdAt: string;
 };
 
 export type PaymentMethod = "Cash" | "Card" | "EFT" | "Customer account";
@@ -270,6 +341,12 @@ type OperationsState = {
   reconciliations: ReconciliationRecord[];
   coolerBatches: CoolerBatch[];
   processingRuns: ProcessingRun[];
+  suppliers: Supplier[];
+  purchaseOrders: PurchaseOrder[];
+  blockTestProfiles: BlockTestProfile[];
+  staffUsers: StaffUser[];
+  foodSafetyChecks: FoodSafetyCheck[];
+  importBatches: ImportBatch[];
 };
 
 type OperationsContextValue = OperationsState & {
@@ -286,11 +363,20 @@ type OperationsContextValue = OperationsState & {
   completeReconciliation(input: ReconciliationSnapshot): ReconciliationRecord;
   receiveDelivery(input: ReceiveDeliveryInput): CoolerBatch;
   processBatch(input: ProcessBatchInput): ProcessingRun;
+  saveInventoryProduct(input: Omit<InventoryItem, "movement" | "reserved" | "physical"> & { physical?: number }): void;
+  saveRetailProduct(input: RetailProduct): void;
+  saveSupplier(input: Supplier): void;
+  savePurchaseOrder(input: { supplierId: string; deliveryDate: string; description: string; orderedKg: number; costPerKg: number; notes?: string }): PurchaseOrder;
+  updatePurchaseOrderStatus(id: string, status: PurchaseOrder["status"]): void;
+  saveBlockTestProfile(profile: BlockTestProfile): void;
+  saveStaffUser(user: StaffUser): void;
+  recordFoodSafetyCheck(input: { area: string; temperatureC: number; maximumC: number; correctiveAction?: string }): FoodSafetyCheck;
+  importCsv(dataset: ImportDataset, rows: CsvRow[], filename: string, mode: ImportMode): ImportBatch;
   resetDemo(): void;
 };
 
-const STORAGE_KEY = "butchery-os-operations-v5";
-const LEGACY_STORAGE_KEYS = ["butchery-os-operations-v4", "butchery-os-operations-v3", "butchery-os-operations-v2"];
+const STORAGE_KEY = "butchery-os-operations-v6";
+const LEGACY_STORAGE_KEYS = ["butchery-os-operations-v5", "butchery-os-operations-v4", "butchery-os-operations-v3", "butchery-os-operations-v2"];
 const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 const round3 = (value: number) => Math.round((value + Number.EPSILON) * 1000) / 1000;
 
@@ -355,9 +441,12 @@ const scalePlus: Record<string, string> = {
   "fat-waste": "1012",
 };
 
-function projectedYields(receivedKg: number, actuals: Record<string, number> = {}): BatchYieldLine[] {
-  return profile.map(([product, percent]) => {
-    const productId = slugify(product);
+function projectedYields(
+  receivedKg: number,
+  actuals: Record<string, number> = {},
+  lines: { productId: string; product: string; percent: number }[] = profile.map(([product, percent]) => ({ productId: slugify(product), product, percent })),
+): BatchYieldLine[] {
+  return lines.map(({ productId, product, percent }) => {
     return {
       productId,
       product,
@@ -367,6 +456,20 @@ function projectedYields(receivedKg: number, actuals: Record<string, number> = {
     };
   });
 }
+
+const seededSuppliers: Supplier[] = [
+  { id: "supplier-kpm", code: "KPM", name: "Karoo Prime Meats", contactPerson: "Anika Smit", phone: "021 555 0142", email: "orders@karooprime.example", paymentTermsDays: 30, active: true },
+  { id: "supplier-hbc", code: "HBC", name: "Highveld Beef Co.", contactPerson: "Neo Maseko", phone: "011 555 0119", email: "sales@highveld.example", paymentTermsDays: 14, active: true },
+  { id: "supplier-ll", code: "LL", name: "Lowveld Livestock", contactPerson: "Marius Nel", phone: "013 555 0191", email: "dispatch@lowveld.example", paymentTermsDays: 30, active: true },
+];
+
+const seededBlockTestProfile: BlockTestProfile = {
+  id: "profile-standard-beef",
+  name: "Standard Beef",
+  active: true,
+  lines: profile.map(([product, percent]) => ({ productId: slugify(product), product, percent })),
+  updatedAt: "2026-07-27T06:00:00.000Z",
+};
 
 const seededBatches: CoolerBatch[] = [
   {
@@ -410,7 +513,15 @@ function createSeedState(): OperationsState {
   return {
     inventory: seedInventory.map((item) => {
       const id = slugify(item.product);
-      return { id, ...item, scalePlu: scalePlus[id], reserved: ticketReserved.get(id) ?? item.reserved };
+      return {
+        id,
+        ...item,
+        scalePlu: scalePlus[id],
+        reserved: ticketReserved.get(id) ?? item.reserved,
+        category: item.product === "Fat/Waste" || item.product === "Bone" ? "By-products" : "Beef cuts",
+        reorderLevelKg: item.product === "Fat/Waste" ? 0 : 15,
+        active: item.product !== "Fat/Waste",
+      };
     }),
     tickets: seededTickets,
     waste: [
@@ -435,6 +546,8 @@ function createSeedState(): OperationsState {
         cost: 10.2,
         stockUnits: 48,
         category: "Cold drinks",
+        reorderLevelUnits: 12,
+        active: true,
       },
     ],
     sales: [
@@ -490,6 +603,26 @@ function createSeedState(): OperationsState {
         completedBy: "Johan Botha", completedAt: "2026-07-27T10:42:00.000Z",
       },
     ],
+    suppliers: seededSuppliers,
+    purchaseOrders: [
+      {
+        id: "po-seed-1", number: "PO-2001", supplierId: "supplier-hbc", supplier: "Highveld Beef Co.",
+        deliveryDate: "2026-07-30", status: "Ordered",
+        lines: [{ id: "po-line-seed-1", description: "Raw Beef", orderedKg: 700, costPerKg: 93.5 }],
+        subtotal: 65450, notes: "Confirm delivery temperature on arrival.", createdBy: "Lerato Dlamini", createdAt: "2026-07-27T13:00:00.000Z",
+      },
+    ],
+    blockTestProfiles: [seededBlockTestProfile],
+    staffUsers: [
+      { id: "user-1", name: "Lerato Dlamini", role: "Manager", active: true },
+      { id: "user-2", name: "Naledi Mokoena", role: "Warehouse", active: true },
+      { id: "user-3", name: "Johan Botha", role: "Butcher", active: true },
+      { id: "user-4", name: "Ayanda Khumalo", role: "Cashier", active: true },
+    ],
+    foodSafetyChecks: [
+      { id: "safety-seed-1", number: "FS-1001", area: "Main cooler", temperatureC: 2.8, maximumC: 5, status: "Pass", recordedBy: "Naledi Mokoena", createdAt: "2026-07-27T06:15:00.000Z" },
+    ],
+    importBatches: [],
   };
 }
 
@@ -502,6 +635,9 @@ function upgradeState(saved: Partial<OperationsState>): OperationsState {
     inventory: savedInventory.map((item) => ({
       ...item,
       scalePlu: item.scalePlu ?? seed.inventory.find((seedItem) => seedItem.id === item.id)?.scalePlu ?? "",
+      category: item.category ?? "Beef cuts",
+      reorderLevelKg: item.reorderLevelKg ?? 15,
+      active: item.active ?? true,
     })),
     tickets: (saved.tickets ?? seed.tickets).map((ticket) => ({
       ...ticket,
@@ -509,13 +645,23 @@ function upgradeState(saved: Partial<OperationsState>): OperationsState {
         ? { ...item, productId: "mince-wors-meat", product: "Mince/Wors Meat" }
         : item),
     })),
-    retailProducts: saved.retailProducts ?? seed.retailProducts,
+    retailProducts: (saved.retailProducts ?? seed.retailProducts).map((item) => ({
+      ...item,
+      reorderLevelUnits: item.reorderLevelUnits ?? 10,
+      active: item.active ?? true,
+    })),
     sales: saved.sales ?? seed.sales,
     tillSessions: saved.tillSessions ?? seed.tillSessions,
     managementReviews: saved.managementReviews ?? seed.managementReviews,
     reconciliations: saved.reconciliations ?? seed.reconciliations,
     coolerBatches: saved.coolerBatches ?? seed.coolerBatches,
     processingRuns: saved.processingRuns ?? seed.processingRuns,
+    suppliers: saved.suppliers ?? seed.suppliers,
+    purchaseOrders: saved.purchaseOrders ?? seed.purchaseOrders,
+    blockTestProfiles: saved.blockTestProfiles ?? seed.blockTestProfiles,
+    staffUsers: saved.staffUsers ?? seed.staffUsers,
+    foodSafetyChecks: saved.foodSafetyChecks ?? seed.foodSafetyChecks,
+    importBatches: saved.importBatches ?? seed.importBatches,
   };
 }
 
@@ -556,6 +702,7 @@ export function OperationsProvider({ children }: { children: React.ReactNode }) 
       const ticketItems = input.items.map((entry, index) => {
         const stock = inventory.find((item) => item.id === entry.productId);
         if (!stock) throw new Error("Product not found");
+        if (!stock.active) throw new Error(`${stock.product} is inactive`);
         const movement = reserveStock(round3(stock.physical - stock.reserved), stock.reserved, entry.weightKg);
         stock.reserved = movement.reservedKg;
         stock.movement = "Just now";
@@ -693,6 +840,7 @@ export function OperationsProvider({ children }: { children: React.ReactNode }) 
           scannedLabels.add(line.barcode);
           const stock = inventory.find((item) => item.id === line.productId);
           if (!stock) throw new Error("Scale product not found");
+          if (!stock.active) throw new Error(`${stock.product} is inactive`);
           assertCanConsume(round3(stock.physical - stock.reserved), line.weightKg);
           stock.physical = round3(stock.physical - line.weightKg);
           stock.movement = "Just now";
@@ -762,6 +910,7 @@ export function OperationsProvider({ children }: { children: React.ReactNode }) 
 
         const retail = retailProducts.find((item) => item.id === line.retailProductId);
         if (!retail) throw new Error("Retail product not found");
+        if (!retail.active) throw new Error(`${retail.name} is inactive`);
         if (!Number.isInteger(line.quantity) || line.quantity <= 0) throw new Error("Retail quantity must be a positive whole number");
         if (line.quantity > retail.stockUnits) throw new Error(`${retail.name}: only ${retail.stockUnits} units available`);
         retail.stockUnits -= line.quantity;
@@ -949,11 +1098,13 @@ export function OperationsProvider({ children }: { children: React.ReactNode }) 
       const calculation = calculateDeliveryVariance(input.invoiceWeightKg, input.actualWeightKg, input.costPerKg);
       const code = nextBatchCode(state.coolerBatches.map((batch) => batch.code), input.deliveryDate);
       const createdAt = new Date().toISOString();
+      const supplier = state.suppliers.find((item) => item.name === input.supplier);
+      const activeProfile = state.blockTestProfiles.find((item) => item.active) ?? seededBlockTestProfile;
       const created: CoolerBatch = {
         id: crypto.randomUUID(),
         code,
         supplier: input.supplier.trim(),
-        supplierCode: input.supplier.split(/\s+/).map((part) => part[0]).join("").slice(0, 4).toUpperCase(),
+        supplierCode: supplier?.code ?? input.supplier.split(/\s+/).map((part) => part[0]).join("").slice(0, 4).toUpperCase(),
         invoiceNumber: input.invoiceNumber.trim(),
         deliveryDate: input.deliveryDate,
         meatType: input.meatType,
@@ -964,8 +1115,8 @@ export function OperationsProvider({ children }: { children: React.ReactNode }) 
         totalCost: calculation.totalCost,
         remainingRawKg: round3(input.actualWeightKg),
         status: "Raw",
-        profileName: "Standard Beef",
-        yields: projectedYields(input.actualWeightKg),
+        profileName: activeProfile.name,
+        yields: projectedYields(input.actualWeightKg, {}, activeProfile.lines),
         notes: input.notes?.trim() || undefined,
         receivedBy: "Naledi Mokoena",
         createdAt,
@@ -1034,6 +1185,228 @@ export function OperationsProvider({ children }: { children: React.ReactNode }) 
       setState({
         ...state, inventory, coolerBatches, processingRuns: [created, ...state.processingRuns],
         ledger: [...ledger, ...state.ledger],
+      });
+      return created;
+    },
+    saveInventoryProduct(input) {
+      if (!input.product.trim()) throw new Error("Enter a product name");
+      if (!/^\d{1,5}$/.test(input.scalePlu)) throw new Error("Scale PLU must contain 1 to 5 digits");
+      if (input.cost < 0 || input.price < 0 || input.reorderLevelKg < 0) throw new Error("Cost, price and reorder level cannot be negative");
+      if (state.inventory.some((item) => item.id !== input.id && normalizePlu(item.scalePlu) === normalizePlu(input.scalePlu))) {
+        throw new Error("That scale PLU is already assigned");
+      }
+      const existing = state.inventory.find((item) => item.id === input.id);
+      const physical = input.physical ?? existing?.physical ?? 0;
+      if (physical < (existing?.reserved ?? 0)) throw new Error("Physical stock cannot be below reserved stock");
+      const saved: InventoryItem = {
+        ...input,
+        product: input.product.trim(),
+        category: input.category.trim() || "Uncategorised",
+        physical: round3(physical),
+        reserved: existing?.reserved ?? 0,
+        movement: existing?.movement ?? "Product created",
+      };
+      const inventory = existing
+        ? state.inventory.map((item) => item.id === input.id ? saved : item)
+        : [...state.inventory, saved];
+      setState({ ...state, inventory });
+    },
+    saveRetailProduct(input) {
+      if (!input.name.trim() || !input.sku.trim()) throw new Error("Enter a name and SKU");
+      if (!/^\d{8,14}$/.test(input.barcode)) throw new Error("Barcode must contain 8 to 14 digits");
+      if (input.cost < 0 || input.price < 0 || input.stockUnits < 0 || input.reorderLevelUnits < 0) throw new Error("Cost, price and stock cannot be negative");
+      if (state.retailProducts.some((item) => item.id !== input.id && (item.sku.toLowerCase() === input.sku.toLowerCase() || item.barcode === input.barcode))) {
+        throw new Error("That SKU or barcode is already assigned");
+      }
+      const saved = { ...input, name: input.name.trim(), sku: input.sku.trim(), category: input.category.trim() || "Uncategorised" };
+      const exists = state.retailProducts.some((item) => item.id === input.id);
+      setState({ ...state, retailProducts: exists ? state.retailProducts.map((item) => item.id === input.id ? saved : item) : [...state.retailProducts, saved] });
+    },
+    saveSupplier(input) {
+      if (!input.name.trim() || !input.code.trim()) throw new Error("Enter a supplier name and code");
+      if (input.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email)) throw new Error("Enter a valid email address");
+      if (state.suppliers.some((item) => item.id !== input.id && item.code.toLowerCase() === input.code.toLowerCase())) throw new Error("That supplier code already exists");
+      const saved = { ...input, code: input.code.trim().toUpperCase(), name: input.name.trim() };
+      const exists = state.suppliers.some((item) => item.id === input.id);
+      setState({ ...state, suppliers: exists ? state.suppliers.map((item) => item.id === input.id ? saved : item) : [...state.suppliers, saved] });
+    },
+    savePurchaseOrder(input) {
+      const supplier = state.suppliers.find((item) => item.id === input.supplierId && item.active);
+      if (!supplier) throw new Error("Select an active supplier");
+      if (!input.description.trim()) throw new Error("Enter what is being ordered");
+      if (input.orderedKg <= 0 || input.costPerKg < 0) throw new Error("Order weight must be positive and cost cannot be negative");
+      const highest = Math.max(2001, ...state.purchaseOrders.map((item) => Number(item.number.replace("PO-", "")) || 0));
+      const created: PurchaseOrder = {
+        id: crypto.randomUUID(),
+        number: `PO-${highest + 1}`,
+        supplierId: supplier.id,
+        supplier: supplier.name,
+        deliveryDate: input.deliveryDate,
+        status: "Draft",
+        lines: [{ id: crypto.randomUUID(), description: input.description.trim(), orderedKg: round3(input.orderedKg), costPerKg: round2(input.costPerKg) }],
+        subtotal: round2(input.orderedKg * input.costPerKg),
+        notes: input.notes?.trim() || undefined,
+        createdBy: "Lerato Dlamini",
+        createdAt: new Date().toISOString(),
+      };
+      setState({ ...state, purchaseOrders: [created, ...state.purchaseOrders] });
+      return created;
+    },
+    updatePurchaseOrderStatus(id, status) {
+      const order = state.purchaseOrders.find((item) => item.id === id);
+      if (!order) throw new Error("Purchase order not found");
+      if (order.status === "Received" || order.status === "Cancelled") throw new Error("A closed purchase order cannot be changed");
+      setState({ ...state, purchaseOrders: state.purchaseOrders.map((item) => item.id === id ? { ...item, status } : item) });
+    },
+    saveBlockTestProfile(savedProfile) {
+      if (!savedProfile.name.trim()) throw new Error("Enter a profile name");
+      const total = round2(savedProfile.lines.reduce((sum, item) => sum + item.percent, 0));
+      if (Math.abs(total - 100) > .01) throw new Error(`Profile yield must total 100.00% (currently ${total.toFixed(2)}%)`);
+      if (savedProfile.lines.some((line) => line.percent < 0)) throw new Error("Yield percentages cannot be negative");
+      const exists = state.blockTestProfiles.some((item) => item.id === savedProfile.id);
+      let blockTestProfiles = exists
+        ? state.blockTestProfiles.map((item) => item.id === savedProfile.id ? { ...savedProfile, name: savedProfile.name.trim(), updatedAt: new Date().toISOString() } : item)
+        : [...state.blockTestProfiles, { ...savedProfile, name: savedProfile.name.trim(), updatedAt: new Date().toISOString() }];
+      if (savedProfile.active) blockTestProfiles = blockTestProfiles.map((item) => ({ ...item, active: item.id === savedProfile.id }));
+      setState({ ...state, blockTestProfiles });
+    },
+    saveStaffUser(user) {
+      if (!user.name.trim()) throw new Error("Enter the staff member's name");
+      const saved = { ...user, name: user.name.trim() };
+      const exists = state.staffUsers.some((item) => item.id === user.id);
+      setState({ ...state, staffUsers: exists ? state.staffUsers.map((item) => item.id === user.id ? saved : item) : [...state.staffUsers, saved] });
+    },
+    recordFoodSafetyCheck(input) {
+      if (!input.area.trim()) throw new Error("Enter the check area");
+      if (!Number.isFinite(input.temperatureC) || !Number.isFinite(input.maximumC)) throw new Error("Enter valid temperatures");
+      const requiresAction = input.temperatureC > input.maximumC;
+      if (requiresAction && !input.correctiveAction?.trim()) throw new Error("Record corrective action for an out-of-range check");
+      const highest = Math.max(1001, ...state.foodSafetyChecks.map((item) => Number(item.number.replace("FS-", "")) || 0));
+      const created: FoodSafetyCheck = {
+        id: crypto.randomUUID(),
+        number: `FS-${highest + 1}`,
+        area: input.area.trim(),
+        temperatureC: round2(input.temperatureC),
+        maximumC: round2(input.maximumC),
+        status: requiresAction ? "Action required" : "Pass",
+        correctiveAction: input.correctiveAction?.trim() || undefined,
+        recordedBy: "Naledi Mokoena",
+        createdAt: new Date().toISOString(),
+      };
+      setState({ ...state, foodSafetyChecks: [created, ...state.foodSafetyChecks] });
+      return created;
+    },
+    importCsv(dataset, rows, filename, mode) {
+      if (!rows.length || rows.some((row) => row.errors.length)) throw new Error("Resolve all CSV errors before importing");
+      const inventory = state.inventory.map((item) => ({ ...item }));
+      const retailProducts = state.retailProducts.map((item) => ({ ...item }));
+      const suppliers = state.suppliers.map((item) => ({ ...item }));
+      const ledger: LedgerMovement[] = [];
+      let createdCount = 0;
+      let updatedCount = 0;
+      let skippedCount = 0;
+      const createdAt = new Date().toISOString();
+      const highest = Math.max(0, ...state.importBatches.map((item) => Number(item.number.replace("IMP-", "")) || 0));
+      const number = `IMP-${String(highest + 1).padStart(4, "0")}`;
+
+      for (const row of rows) {
+        const value = row.values;
+        if (dataset === "weighted-products") {
+          const existing = inventory.find((item) => item.scalePlu === value.scale_plu || item.product.toLowerCase() === value.product.toLowerCase());
+          if (existing && mode === "add-only") {
+            skippedCount += 1;
+            continue;
+          }
+          const openingStock = value.opening_stock_kg === "" ? undefined : Number(value.opening_stock_kg);
+          if (existing) {
+            const previousPhysical = existing.physical;
+            Object.assign(existing, {
+              product: value.product,
+              category: value.category || existing.category,
+              scalePlu: value.scale_plu,
+              cost: Number(value.cost_per_kg),
+              price: Number(value.selling_price_per_kg),
+              reorderLevelKg: Number(value.reorder_level_kg || existing.reorderLevelKg),
+              active: booleanFromCsv(value.active, existing.active),
+              physical: openingStock === undefined ? existing.physical : round3(openingStock),
+              movement: openingStock === undefined || openingStock === previousPhysical ? existing.movement : "CSV stock adjustment",
+            });
+            if (existing.physical < existing.reserved) throw new Error(`${existing.product}: opening stock cannot be below reserved stock`);
+            if (openingStock !== undefined && openingStock !== previousPhysical) ledger.push({
+              id: crypto.randomUUID(), product: existing.product, quantityKg: Math.abs(openingStock - previousPhysical),
+              type: "PHYSICAL_COUNT_ADJUSTMENT", reason: "CSV opening stock adjustment", reference: number, createdAt,
+            });
+            updatedCount += 1;
+          } else {
+            const idBase = slugify(value.product);
+            const id = inventory.some((item) => item.id === idBase) ? `${idBase}-${crypto.randomUUID().slice(0, 6)}` : idBase;
+            inventory.push({
+              id, product: value.product, category: value.category || "Uncategorised", scalePlu: value.scale_plu,
+              cost: Number(value.cost_per_kg), price: Number(value.selling_price_per_kg),
+              reorderLevelKg: Number(value.reorder_level_kg || 0), active: booleanFromCsv(value.active),
+              physical: round3(openingStock ?? 0), reserved: 0, movement: "Imported",
+            });
+            if (openingStock) ledger.push({
+              id: crypto.randomUUID(), product: value.product, quantityKg: openingStock,
+              type: "PHYSICAL_COUNT_ADJUSTMENT", reason: "CSV opening stock", reference: number, createdAt,
+            });
+            createdCount += 1;
+          }
+        } else if (dataset === "retail-products") {
+          const existing = retailProducts.find((item) => item.sku.toLowerCase() === value.sku.toLowerCase() || item.barcode === value.barcode);
+          if (existing && mode === "add-only") {
+            skippedCount += 1;
+            continue;
+          }
+          const openingStock = value.opening_stock_units === "" ? undefined : Number(value.opening_stock_units);
+          if (existing) {
+            Object.assign(existing, {
+              sku: value.sku, name: value.name, barcode: value.barcode, category: value.category || existing.category,
+              cost: Number(value.cost_per_unit), price: Number(value.selling_price_per_unit),
+              reorderLevelUnits: Number(value.reorder_level_units || existing.reorderLevelUnits),
+              stockUnits: openingStock ?? existing.stockUnits, active: booleanFromCsv(value.active, existing.active),
+            });
+            updatedCount += 1;
+          } else {
+            retailProducts.push({
+              id: crypto.randomUUID(), sku: value.sku, name: value.name, barcode: value.barcode,
+              category: value.category || "Uncategorised", cost: Number(value.cost_per_unit),
+              price: Number(value.selling_price_per_unit), reorderLevelUnits: Number(value.reorder_level_units || 0),
+              stockUnits: openingStock ?? 0, active: booleanFromCsv(value.active),
+            });
+            createdCount += 1;
+          }
+        } else {
+          const existing = suppliers.find((item) => item.code.toLowerCase() === value.supplier_code.toLowerCase());
+          if (existing && mode === "add-only") {
+            skippedCount += 1;
+            continue;
+          }
+          if (existing) {
+            Object.assign(existing, {
+              code: value.supplier_code.toUpperCase(), name: value.name, contactPerson: value.contact_person || "",
+              phone: value.phone || "", email: value.email || "", paymentTermsDays: Number(value.payment_terms_days || 0),
+              active: booleanFromCsv(value.active, existing.active),
+            });
+            updatedCount += 1;
+          } else {
+            suppliers.push({
+              id: crypto.randomUUID(), code: value.supplier_code.toUpperCase(), name: value.name,
+              contactPerson: value.contact_person || "", phone: value.phone || "", email: value.email || "",
+              paymentTermsDays: Number(value.payment_terms_days || 0), active: booleanFromCsv(value.active),
+            });
+            createdCount += 1;
+          }
+        }
+      }
+
+      const created: ImportBatch = {
+        id: crypto.randomUUID(), number, dataset, filename, rowCount: rows.length,
+        createdCount, updatedCount, skippedCount, importedBy: "Lerato Dlamini", createdAt,
+      };
+      setState({
+        ...state, inventory, retailProducts, suppliers,
+        ledger: [...ledger, ...state.ledger], importBatches: [created, ...state.importBatches],
       });
       return created;
     },
