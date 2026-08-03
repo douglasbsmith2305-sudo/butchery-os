@@ -1,8 +1,8 @@
 "use client";
 
 import {
-  ArrowDownRight, ArrowRight, ArrowUpRight, Check, ChevronRight, CircleAlert,
-  Clock3, PackageOpen, Plus, Scale, Scissors, ShieldCheck, Sparkles, Truck,
+  ArrowDownRight, ArrowRight, ArrowUpRight, BarChart3, Check, ChevronRight, CircleAlert,
+  Clock3, PackageOpen, Plus, Receipt, Scale, Scissors, ShieldCheck, Sparkles, Truck,
 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -15,6 +15,7 @@ import { useOperations } from "@/components/operations-store";
 import { PosCheckoutScreen } from "@/components/pos-checkout";
 import { PosSalesScreen } from "@/components/pos-sales";
 import { PosTillScreen } from "@/components/pos-till";
+import { ReportCenter } from "@/components/report-center";
 import {
   BatchProfitabilityScreen,
   ManagementDashboard,
@@ -57,7 +58,7 @@ function Metric({ name, value, detail, trend, tone = "neutral" }: { name: string
 }
 
 function Dashboard() {
-  const { coolerBatches, inventory, ledger, processingRuns, stockCounts, tickets, waste } = useOperations();
+  const { coolerBatches, inventory, ledger, stockCounts, tickets, waste } = useOperations();
   const physicalKg = inventory.reduce((sum, item) => sum + item.physical, 0);
   const reservedKg = inventory.reduce((sum, item) => sum + item.reserved, 0);
   const inventoryValue = inventory.reduce((sum, item) => sum + item.physical * item.cost, 0);
@@ -65,38 +66,35 @@ function Dashboard() {
   const today = new Date().toISOString().slice(0, 10);
   const wasteToday = waste.filter((item) => item.createdAt.slice(0, 10) === today).reduce((sum, item) => sum + item.weightKg, 0);
   const unprocessedKg = coolerBatches.reduce((sum, batch) => sum + batch.remainingRawKg, 0);
-  const receivedToday = coolerBatches.filter((batch) => batch.deliveryDate === today).reduce((sum, batch) => sum + batch.receivedKg, 0);
-  const processedToday = processingRuns.filter((run) => run.completedAt.slice(0, 10) === today).reduce((sum, run) => sum + run.inputKg, 0);
-  const lossToday = processingRuns.filter((run) => run.completedAt.slice(0, 10) === today).reduce((sum, run) => sum + run.lossKg, 0);
-  const todayReceipts = coolerBatches.filter((batch) => batch.deliveryDate === today);
-  const todayRuns = processingRuns.filter((run) => run.completedAt.slice(0, 10) === today);
   const todayCount = stockCounts.find((count) => count.createdAt.slice(0, 10) === today);
+  const lowStock = inventory.filter((item) => item.active && item.physical - item.reserved <= item.reorderLevelKg);
+  const rawBatches = coolerBatches.filter((batch) => batch.remainingRawKg > 0);
   const movementSign = (type: typeof ledger[number]["type"]) => ["SUPPLIER_RECEIPT", "PROCESSING_OUTPUT", "BOOKING_CANCELLATION", "CUSTOMER_RETURN"].includes(type) ? "+" : "−";
+  const quickActions = [
+    { title: "Receive stock", copy: "Capture a supplier delivery", href: "/cooler/receive", icon: Truck },
+    { title: "Process a batch", copy: "Turn raw meat into cuts", href: "/cooler/processing", icon: Scissors },
+    { title: "New butcher order", copy: "Weigh and reserve an order", href: "/butcher/new", icon: Scale },
+    { title: "Open checkout", copy: "Scan barcodes and take payment", href: "/pos/checkout", icon: Receipt },
+  ];
   return <>
-    <Title eyebrow="Cooler control" title="Good morning, Naledi." copy="Every kilogram is accounted for across receiving, processing, finished stock and customer orders." action={<Link className={button} href="/cooler/receive"><Plus size={16}/> Receive delivery</Link>}/>
-    <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <Metric name="Physical stock" value={kg(physicalKg)} detail={`${inventory.length} finished products`} trend="+4.2%"/>
-      <Metric name="Available stock" value={kg(physicalKg - reservedKg)} detail={`${reservedKg.toFixed(2)} kg reserved`} tone="green"/>
-      <Metric name="Inventory value" value={zar.format(inventoryValue)} detail="Weighted average cost"/>
-      <Metric name="Unprocessed beef" value={kg(unprocessedKg)} detail={`${coolerBatches.filter((batch) => batch.remainingRawKg > 0).length} active batches`} tone="amber"/>
+    <Title eyebrow="Today" title="What needs doing?" copy="Choose a task below. The system will guide you through it step by step." action={<Link className={button} href="/reports"><BarChart3 size={16}/> View business report</Link>}/>
+    <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <Metric name="Stock available" value={kg(physicalKg - reservedKg)} detail={`${reservedKg.toFixed(1)} kg set aside for orders`} tone="green"/>
+      <Metric name="Stock value" value={zar.format(inventoryValue)} detail={`${inventory.length} products in the cooler`}/>
+      <Metric name="Waiting to process" value={kg(unprocessedKg)} detail={`${rawBatches.length} batch${rawBatches.length === 1 ? "" : "es"}`} tone={rawBatches.length ? "amber" : "green"}/>
+      <Metric name="Waste today" value={kg(wasteToday)} detail={wasteToday ? "Review the waste record" : "No waste recorded today"} tone={wasteToday ? "amber" : "green"}/>
     </div>
-    <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <Metric name="Received today" value={kg(receivedToday)} detail={`${coolerBatches.filter((batch) => batch.deliveryDate === today).length} supplier deliveries`}/>
-      <Metric name="Processed today" value={kg(processedToday)} detail={`${processingRuns.filter((run) => run.completedAt.slice(0, 10) === today).length} completed sessions`} tone="green"/>
-      <Metric name="Processing loss" value={kg(lossToday)} detail={processedToday ? `${(lossToday / processedToday * 100).toFixed(2)}% of today's input` : "No processing posted today"} tone={lossToday ? "amber" : "green"}/>
-      <Metric name="Waste today" value={kg(wasteToday)} detail={`${openTickets} open butcher ticket${openTickets === 1 ? "" : "s"}`} tone="neutral"/>
-    </div>
-    <div className="grid gap-4 xl:grid-cols-[1.45fr_.8fr]">
-      <div className={`${card} overflow-hidden`}>
-        <div className="flex items-center justify-between border-b border-[#322a2a] p-5"><div><h2 className="text-sm font-semibold">Recent stock movements</h2><p className="mt-1 text-xs text-[#6f7a84]">Immutable ledger entries across the operation</p></div><Link className="text-xs font-medium text-[#f06a6d]" href="/cooler/inventory">View inventory</Link></div>
-        <div className="scrollbar overflow-x-auto"><table className="w-full min-w-[700px] text-left"><thead><tr className="border-b border-[#2b2424] text-[10px] uppercase tracking-[.12em] text-[#69747d]">{["Time","Transaction","Product","Batch","Movement","Weight","User"].map(x=><th key={x} className="px-5 py-3 font-medium">{x}</th>)}</tr></thead>
-        <tbody>{ledger.slice(0, 6).map((row)=><tr key={row.id} className="border-b border-[#1f252a] text-xs last:border-0 hover:bg-[#1a1515]"><td className="px-5 py-4 text-[#7f8992]">{new Date(row.createdAt).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })}</td><td className="px-5 py-4 font-mono text-[#98a4ad]">{row.reference}</td><td className="px-5 py-4 font-medium">{row.product}</td><td className="px-5 py-4 font-mono text-[#7f8992]">{row.batchCode ?? "—"}</td><td className="px-5 py-4 text-[#a2abb2]">{row.type.replaceAll("_", " ")}</td><td className={`px-5 py-4 font-mono font-semibold ${movementSign(row.type) === "+" ? "text-[#57c88b]" : "text-[#e2787e]"}`}>{movementSign(row.type)}{row.quantityKg.toFixed(3)} kg</td><td className="px-5 py-4 text-[#7f8992]">{row.type.startsWith("PROCESSING") ? "J. Botha" : row.type === "SUPPLIER_RECEIPT" ? "N. Mokoena" : "Operations"}</td></tr>)}</tbody></table></div>
-      </div>
-      <div className={`${card} p-5`}>
-        <div className="flex items-center justify-between"><div><h2 className="text-sm font-semibold">Traceability health</h2><p className="mt-1 text-xs text-[#6f7a84]">Today’s control checks</p></div><ShieldCheck className="text-[#54c589]" size={22}/></div>
-        <div className="my-7 flex items-center gap-5"><div className="grid size-20 place-items-center rounded-full border-[7px] border-[#245a43] bg-[#10271d] text-xl font-semibold text-[#68d19a]">100%</div><div><p className="text-lg font-semibold">Ledger controls active</p><p className="mt-1 text-xs leading-5 text-[#77828b]">Posted processing sessions are mass-balanced before inventory can change.</p></div></div>
-        {[["Delivery weights captured",`${todayReceipts.length} / ${todayReceipts.length}`,true],["Processing sessions reconciled",`${todayRuns.length} / ${todayRuns.length}`,true],["Batch links retained",`${ledger.filter((item) => item.batchCode).length} linked`,true],["Stock count",todayCount ? `${todayCount.number} complete` : "Due today",Boolean(todayCount)]].map(([x,y,ok])=><div key={String(x)} className="flex items-center gap-3 border-t border-[#302728] py-3 text-xs"><span className={`grid size-5 place-items-center rounded-full ${ok ? "bg-[#163a2a] text-[#61cd94]" : "bg-[#39290f] text-[#e1aa4b]"}`}>{ok ? <Check size={12}/> : <Clock3 size={12}/>}</span><span className="flex-1 text-[#a1aab2]">{x}</span><span className="text-[#78838c]">{y}</span></div>)}
-      </div>
+    <section className="mb-4"><div className="mb-3 flex items-center justify-between"><div><h2 className="text-base font-semibold">Start a job</h2><p className="mt-1 text-xs text-[#8f8484]">Most-used actions</p></div></div><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{quickActions.map(({ title, copy, href, icon: Icon }) => <Link className={`${card} group flex items-center gap-4 p-5 transition hover:border-[#713033] hover:bg-[#1b1415]`} href={href} key={href}><span className="grid size-11 shrink-0 place-items-center rounded-lg bg-[#291719] text-[#ef5b5e]"><Icon size={20}/></span><span className="min-w-0"><strong className="block text-sm">{title}</strong><span className="mt-1 block text-xs leading-5 text-[#8f8484]">{copy}</span></span><ChevronRight className="ml-auto shrink-0 text-[#6e6262] transition group-hover:translate-x-0.5 group-hover:text-[#ef5b5e]" size={17}/></Link>)}</div></section>
+    <div className="grid gap-4 xl:grid-cols-[.85fr_1.15fr]">
+      <section className={`${card} p-5`}><div className="mb-4 flex items-center justify-between"><div><h2 className="text-sm font-semibold">Needs attention</h2><p className="mt-1 text-xs text-[#8f8484]">A short list of things to check</p></div><CircleAlert className="text-[#e2ab4d]" size={20}/></div>
+        {[
+          { label: "Raw batches waiting", value: String(rawBatches.length), href: "/cooler/processing", ok: rawBatches.length === 0 },
+          { label: "Low-stock products", value: String(lowStock.length), href: "/cooler/inventory", ok: lowStock.length === 0 },
+          { label: "Open butcher orders", value: String(openTickets), href: "/butcher/open", ok: openTickets === 0 },
+          { label: "Today’s stock count", value: todayCount ? "Done" : "Not done", href: "/cooler/stock-count", ok: Boolean(todayCount) },
+        ].map((item) => <Link className="flex min-h-14 items-center gap-3 border-t border-[#302728] text-sm first:border-t-0" href={item.href} key={item.label}><span className={`grid size-7 place-items-center rounded-full ${item.ok ? "bg-[#153629] text-[#61cd94]" : "bg-[#38290f] text-[#e1aa4b]"}`}>{item.ok ? <Check size={14}/> : <Clock3 size={14}/>}</span><span className="flex-1 text-[#c0b6b6]">{item.label}</span><strong className={item.ok ? "text-[#67d098]" : "text-[#e5b45c]"}>{item.value}</strong><ChevronRight className="text-[#6e6262]" size={15}/></Link>)}
+      </section>
+      <section className={`${card} overflow-hidden`}><div className="flex items-center justify-between border-b border-[#322a2a] p-5"><div><h2 className="text-sm font-semibold">Latest activity</h2><p className="mt-1 text-xs text-[#8f8484]">The five newest stock changes</p></div><Link className="text-xs font-medium text-[#f06a6d]" href="/cooler/inventory">See all stock</Link></div><div>{ledger.slice(0, 5).map((row) => <div className="flex items-center gap-3 border-b border-[#302728] px-5 py-4 last:border-0" key={row.id}><span className={`grid size-8 shrink-0 place-items-center rounded-full text-sm font-semibold ${movementSign(row.type) === "+" ? "bg-[#153629] text-[#61cd94]" : "bg-[#38191c] text-[#e87980]"}`}>{movementSign(row.type)}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{row.product}</p><p className="mt-1 truncate text-xs text-[#8f8484]">{row.type.replaceAll("_", " ").toLowerCase()} · {row.reference}</p></div><div className="text-right"><p className="font-mono text-sm font-semibold">{row.quantityKg.toFixed(2)} kg</p><p className="mt-1 text-xs text-[#8f8484]">{new Date(row.createdAt).toLocaleDateString("en-ZA", { day: "numeric", month: "short" })}</p></div></div>)}</div></section>
     </div>
   </>;
 }
@@ -200,6 +198,7 @@ export function ScreenRouter({ path }: { path: string }) {
   if (path === "/pos/checkout") return <PosCheckoutScreen/>;
   if (path === "/pos/sales") return <PosSalesScreen/>;
   if (path === "/pos/till") return <PosTillScreen/>;
+  if (path === "/reports") return <ReportCenter/>;
   if (path === "/management") return <ManagementDashboard/>;
   if (path === "/management/products") return <ProductProfitabilityScreen/>;
   if (path === "/management/batches") return <BatchProfitabilityScreen/>;
