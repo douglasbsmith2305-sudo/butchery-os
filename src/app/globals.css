@@ -39,3 +39,13 @@ button { cursor: pointer; }
     linear-gradient(90deg, rgba(239,48,52,.022) 1px, transparent 1px);
   background-size: 26px 26px;
 }
+
+@media print {
+  html { background: white; color-scheme: light; }
+  body { background: white; color: #161111; }
+  aside, header { display: none !important; }
+  main { padding-left: 0 !important; }
+  .grid-bg { min-height: auto; padding: 0 !important; background: white; }
+  .metric-glow, section, .rounded-xl { box-shadow: none !important; }
+  section, .rounded-xl { break-inside: avoid; border-color: #d8cccc !important; background: white !important; color: #161111 !important; }
+}
