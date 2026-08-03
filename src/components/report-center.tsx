@@ -32,7 +32,6 @@ function Bar({ name, value, max, display }: { name: string; value: number; max: 
 export function ReportCenter() {
   const operations = useOperations();
   const [message, setMessage] = useState("");
-  const [generatedAt] = useState(() => new Date());
   const completedSales = operations.sales.filter((sale) => sale.status === "Completed");
   const revenue = completedSales.reduce((sum, sale) => sum + sale.revenue, 0);
   const profit = completedSales.reduce((sum, sale) => sum + sale.grossProfit, 0);
@@ -90,7 +89,8 @@ export function ReportCenter() {
   })();
 
   function handleDownload() {
-    const stamp = new Date().toISOString().slice(0, 10);
+    const generatedAt = new Date();
+    const stamp = generatedAt.toISOString().slice(0, 10);
     const csv = buildSectionedCsv("George's Butchery — Complete operations report", generatedAt.toLocaleString("en-ZA"), tables);
     downloadCsv(`georges-butchery-complete-report-${stamp}.csv`, csv);
     setMessage(`Complete report downloaded with ${tables.length} clearly labelled sections.`);
@@ -116,6 +116,6 @@ export function ReportCenter() {
       <section className={`${card} p-5 sm:p-6`}><div className="mb-6 flex items-center justify-between"><div><h2 className="font-semibold">Kilogram overview</h2><p className="mt-1 text-xs text-[#918686]">All recorded operational activity</p></div><Scale className="text-[#ef5b5e]" size={20}/></div><div className="space-y-5">{activityChart.map((item) => <Bar key={item.name} name={item.name} value={item.value} max={maxActivity} display={kg(item.value)}/>)}</div></section>
     </div>
     <section className={`${card} mt-4 overflow-hidden`}><div className="border-b border-[#3a3030] p-5"><div className="flex items-center gap-3"><FileSpreadsheet className="text-[#ef5b5e]" size={20}/><div><h2 className="font-semibold">What is included in the CSV</h2><p className="mt-1 text-xs text-[#918686]">One file, organised into readable sections with plain headings.</p></div></div></div><div className="grid gap-px bg-[#3a3030] sm:grid-cols-2 lg:grid-cols-3">{tables.map((table) => <div className="bg-[#151212] px-5 py-4" key={table.title}><p className="text-sm font-medium">{table.title}</p><p className="mt-1 text-xs text-[#918686]">{table.rows.length} record{table.rows.length === 1 ? "" : "s"}</p></div>)}</div></section>
-    <p className="mt-4 text-xs text-[#746969] print:text-black">Generated {generatedAt.toLocaleString("en-ZA")} from the records currently stored in Butchery OS.</p>
+    <p className="mt-4 text-xs text-[#746969] print:text-black">The download and printout are generated from the records currently stored in Butchery OS.</p>
   </div>;
 }
