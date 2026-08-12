@@ -16,20 +16,25 @@ async function ensureSchema() {
     env.DB.prepare("INSERT OR IGNORE INTO business_settings (key,value,updated_at) VALUES ('low_stock_threshold','5',?)").bind(new Date().toISOString()),
     env.DB.prepare("INSERT OR IGNORE INTO business_settings (key,value,updated_at) VALUES ('order_lead_time','60',?)").bind(new Date().toISOString()),
     env.DB.prepare("INSERT OR IGNORE INTO business_settings (key,value,updated_at) VALUES ('receipt_footer','Thank you for supporting George''s Butchery',?)").bind(new Date().toISOString()),
+    env.DB.prepare("INSERT OR IGNORE INTO business_settings (key,value,updated_at) VALUES ('target_net_margin','8',?)").bind(new Date().toISOString()),
+    env.DB.prepare("INSERT OR IGNORE INTO business_settings (key,value,updated_at) VALUES ('monthly_operating_expenses','0',?)").bind(new Date().toISOString()),
   ]);
 }
 
 export async function GET() {
   await ensureSchema();
-  const [products, wastes, counts, settings, sales, supplierInvoices, productSales, priceHistory] = await Promise.all([
+  const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0); const monthStartIso=monthStart.toISOString();
+  const [products, wastes, counts, settings, sales, supplierInvoices, productSales, priceHistory, monthWaste, monthVariance] = await Promise.all([
     env.DB.prepare("SELECT id,sku,barcode,name,department,unit,cost_price AS costPrice,selling_price AS sellingPrice,quantity FROM products ORDER BY name").all(),
     env.DB.prepare("SELECT id,product_id AS productId,product_name AS productName,quantity,reason,value,created_at AS createdAt FROM waste_records ORDER BY id DESC LIMIT 100").all(),
     env.DB.prepare("SELECT id,count_number AS countNumber,product_id AS productId,product_name AS productName,expected_quantity AS expectedQuantity,counted_quantity AS countedQuantity,variance,reason,created_at AS createdAt FROM stock_counts ORDER BY id DESC LIMIT 100").all(),
     env.DB.prepare("SELECT key,value FROM business_settings ORDER BY key").all(),
     env.DB.prepare("SELECT total,payment_method AS paymentMethod,status,created_at AS createdAt FROM pos_sales ORDER BY id DESC LIMIT 1000").all(),
     env.DB.prepare("SELECT amount,balance,status,due_date AS dueDate FROM supplier_invoices ORDER BY id DESC LIMIT 1000").all(),
-    env.DB.prepare("SELECT p.id,p.name,p.department,p.unit,p.cost_price AS costPrice,p.selling_price AS sellingPrice,p.quantity AS stockQuantity,COALESCE(SUM(CASE WHEN s.status='PAID' THEN i.quantity ELSE 0 END),0) AS soldQuantity,COALESCE(SUM(CASE WHEN s.status='PAID' THEN i.line_total ELSE 0 END),0) AS revenue FROM products p LEFT JOIN pos_sale_items i ON i.product_id=p.id LEFT JOIN pos_sales s ON s.id=i.sale_id GROUP BY p.id,p.name,p.department,p.unit,p.cost_price,p.selling_price,p.quantity ORDER BY revenue DESC,p.name").all(),
+    env.DB.prepare("SELECT p.id,p.name,p.department,p.unit,p.cost_price AS costPrice,p.selling_price AS sellingPrice,p.quantity AS stockQuantity,COALESCE(SUM(CASE WHEN s.status='PAID' AND s.created_at>=? THEN i.quantity ELSE 0 END),0) AS soldQuantity,COALESCE(SUM(CASE WHEN s.status='PAID' AND s.created_at>=? THEN i.line_total ELSE 0 END),0) AS revenue FROM products p LEFT JOIN pos_sale_items i ON i.product_id=p.id LEFT JOIN pos_sales s ON s.id=i.sale_id GROUP BY p.id,p.name,p.department,p.unit,p.cost_price,p.selling_price,p.quantity ORDER BY revenue DESC,p.name").bind(monthStartIso,monthStartIso).all(),
     env.DB.prepare("SELECT h.id,h.product_id AS productId,p.name AS productName,h.old_price AS oldPrice,h.new_price AS newPrice,h.reason,h.effective_at AS effectiveAt FROM price_history h JOIN products p ON p.id=h.product_id ORDER BY h.id DESC LIMIT 100").all(),
+    env.DB.prepare("SELECT COALESCE(SUM(value),0) AS value FROM waste_records WHERE created_at>=?").bind(monthStartIso).first<{value:number}>(),
+    env.DB.prepare("SELECT COALESCE(SUM(CASE WHEN c.variance<0 THEN -c.variance*p.cost_price ELSE 0 END),0) AS value FROM stock_counts c JOIN products p ON p.id=c.product_id WHERE c.created_at>=?").bind(monthStartIso).first<{value:number}>(),
   ]);
   const productRows = products.results as Array<{ quantity: number; costPrice: number; sellingPrice: number }>;
   const saleRows = sales.results as Array<{ total: number; status: string }>;
@@ -39,7 +44,9 @@ export async function GET() {
   const byproducts = performance.filter(p => /bone|bones|fat|waste|vet|been/i.test(p.name));
   const byproductCostDrag = byproducts.reduce((sum,p)=>sum+Math.max(0,p.costPrice-p.sellingPrice)*p.stockQuantity,0);
   const saleableStockKg = performance.filter(p=>!byproducts.some(b=>b.id===p.id)&&p.unit.toLowerCase()==="kg").reduce((sum,p)=>sum+p.stockQuantity,0);
-  return Response.json({ products: products.results, wastes: wastes.results, counts: counts.results, productPerformance: performance, priceHistory: priceHistory.results, pricing: { byproducts, byproductCostDrag, saleableStockKg, recoveryPerKg: saleableStockKg ? byproductCostDrag/saleableStockKg : 0 }, settings: Object.fromEntries((settings.results as Array<{ key: string; value: string }>).map(item => [item.key, item.value])), report: { revenue: saleRows.filter(s => s.status === "PAID").reduce((sum, sale) => sum + sale.total, 0), stockValue: productRows.reduce((sum, product) => sum + product.quantity * product.costPrice, 0), retailValue: productRows.reduce((sum, product) => sum + product.quantity * product.sellingPrice, 0), wasteKg: wasteRows.reduce((sum, waste) => sum + waste.quantity, 0), wasteValue: wasteRows.reduce((sum, waste) => sum + waste.value, 0), supplierBalance: invoiceRows.filter(i => i.status === "OPEN").reduce((sum, invoice) => sum + invoice.balance, 0), productCount: productRows.length } });
+  const settingMap=Object.fromEntries((settings.results as Array<{ key: string; value: string }>).map(item => [item.key, item.value]));
+  const monthRevenue=performance.reduce((sum,p)=>sum+p.revenue,0); const monthCogs=performance.reduce((sum,p)=>sum+p.soldQuantity*p.costPrice,0); const monthLosses=Number(monthWaste?.value??0)+Number(monthVariance?.value??0)+byproductCostDrag; const operatingExpenses=Number(settingMap.monthly_operating_expenses??0); const targetNetMargin=Number(settingMap.target_net_margin??8); const totalCostBurden=monthCogs+monthLosses+operatingExpenses; const targetRevenue=totalCostBurden/Math.max(.05,1-targetNetMargin/100);
+  return Response.json({ products: products.results, wastes: wastes.results, counts: counts.results, productPerformance: performance, priceHistory: priceHistory.results, pricing: { byproducts, byproductCostDrag, saleableStockKg, recoveryPerKg: saleableStockKg ? byproductCostDrag/saleableStockKg : 0, monthRevenue, monthCogs, monthWaste:Number(monthWaste?.value??0), monthVarianceLoss:Number(monthVariance?.value??0), operatingExpenses, targetNetMargin, totalCostBurden, netProfit:monthRevenue-totalCostBurden, targetRevenue, revenueGap:Math.max(0,targetRevenue-monthRevenue), portfolioUplift:monthRevenue?Math.max(1,targetRevenue/monthRevenue):1 }, settings: settingMap, report: { revenue: saleRows.filter(s => s.status === "PAID").reduce((sum, sale) => sum + sale.total, 0), stockValue: productRows.reduce((sum, product) => sum + product.quantity * product.costPrice, 0), retailValue: productRows.reduce((sum, product) => sum + product.quantity * product.sellingPrice, 0), wasteKg: wasteRows.reduce((sum, waste) => sum + waste.quantity, 0), wasteValue: wasteRows.reduce((sum, waste) => sum + waste.value, 0), supplierBalance: invoiceRows.filter(i => i.status === "OPEN").reduce((sum, invoice) => sum + invoice.balance, 0), productCount: productRows.length } });
 }
 
 export async function POST(request: Request) {
@@ -60,7 +67,7 @@ export async function POST(request: Request) {
     return Response.json({ ok: true, reference: countNumber, variance });
   }
   if (payload.action === "settings") {
-    const allowed = ["business_name","yield_tolerance","vat_rate","default_terms","low_stock_threshold","order_lead_time","receipt_footer"]; const entries = Object.entries(payload.settings ?? {}).filter(([key]) => allowed.includes(key));
+    const allowed = ["business_name","yield_tolerance","vat_rate","default_terms","low_stock_threshold","order_lead_time","receipt_footer","target_net_margin","monthly_operating_expenses"]; const entries = Object.entries(payload.settings ?? {}).filter(([key]) => allowed.includes(key));
     if (!entries.length) return Response.json({ error: "No settings supplied" }, { status: 400 });
     await env.DB.batch(entries.map(([key,value]) => env.DB.prepare("INSERT INTO business_settings (key,value,updated_at) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at").bind(key, String(value), now)));
     return Response.json({ ok: true, reference: "SETTINGS-SAVED" });
