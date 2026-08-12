@@ -87,10 +87,10 @@ export default function Home() {
         <nav aria-label="Main navigation">
           <p>OPERATIONS</p>
           {[
-            ["Overview", "01"], ["Receiving", "02"], ["Stock master", "03"], ["Cooler inventory", "04"], ["Butcher counter", "05"], ["POS", "06"],
+            ["Overview", "01"], ["Receiving", "02"], ["Batch tracking", "03"], ["Stock master", "04"], ["Cooler inventory", "05"], ["Butcher counter", "06"], ["POS", "07"],
           ].map(([name, number]) => <button key={name} className={section === name ? "active" : ""} onClick={() => setSection(name)}><span>{number}</span>{name}</button>)}
           <p>CONTROL</p>
-          {["Accounts & Calendar", "Stock count", "Waste & loss", "Reports", "Settings"].map((name, i) => <button key={name} className={section === name ? "active" : ""} onClick={() => setSection(name)}><span>{i + 7}</span>{name}</button>)}
+          {["Accounts & Calendar", "Stock count", "Waste & loss", "Reports", "Settings"].map((name, i) => <button key={name} className={section === name ? "active" : ""} onClick={() => setSection(name)}><span>{i + 8}</span>{name}</button>)}
         </nav>
         <div className="operator"><span>NM</span><div><strong>Naledi Mokoena</strong><small>Warehouse operator</small></div></div>
       </aside>
@@ -102,7 +102,7 @@ export default function Home() {
           <div className="shift">WED 12 AUG · MORNING SHIFT</div>
         </header>
 
-        {section === "Stock master" ? <StockMaster /> : section === "POS" ? <FinancialControl initialTab="POS documents" /> : section === "Accounts & Calendar" ? <FinancialControl initialTab="Accounts overview" /> : <div className="content">
+        {section === "Overview" ? <OperationsOverview batches={batches} onNavigate={setSection} /> : section === "Batch tracking" ? <BatchTracking batches={batches} /> : section === "Cooler inventory" ? <CoolerInventory estimates={estimates} /> : section === "Butcher counter" ? <ButcherCounter estimates={estimates} /> : section === "Stock master" ? <StockMaster /> : section === "POS" ? <FinancialControl initialTab="POS documents" /> : section === "Accounts & Calendar" ? <FinancialControl initialTab="Accounts overview" /> : <div className="content">
           <div className="eyebrow">COOLER / RECEIVING</div>
           <div className="page-heading">
             <div><h1>Receive meat. Know what you have.</h1><p>One scale weight creates estimated cut inventory automatically. No manual block test required.</p></div>
@@ -152,6 +152,32 @@ export default function Home() {
       </main>
     </div>
   );
+}
+
+function OperationsOverview({ batches, onNavigate }: { batches: Batch[]; onNavigate: (section: string) => void }) {
+  const received = batches.reduce((sum, batch) => sum + batch.weight, 0);
+  const actions = [["Receiving", "Receive stock", "Capture a supplier delivery"], ["Batch tracking", "Track batches", "Follow every delivery and allocation"], ["Butcher counter", "New butcher order", "Weigh and reserve customer stock"], ["POS", "Open POS controls", "Payments, notes, returns and payouts"]];
+  return <div className="content"><div className="eyebrow">GEORGE&apos;S BUTCHERY / OVERVIEW</div><div className="page-heading"><div><h1>What needs doing?</h1><p>Your live operational view from supplier delivery through the customer counter.</p></div><span className="status-pill">ALL SYSTEMS ONLINE</span></div>
+    <section className="stat-grid"><article><small>RAW BATCHES</small><strong>{batches.length}</strong><em>{kg(received, 1)} traceable stock</em></article><article><small>COOLER STOCK</small><strong>{kg(received * .758, 1)}</strong><em>Estimated saleable quantity</em></article><article><small>OPEN BUTCHER ORDERS</small><strong>1</strong><em>Awaiting payment at POS</em></article><article><small>CONTROL STATUS</small><strong className="green">Balanced</strong><em>Automatic yield tolerance ±2%</em></article></section>
+    <section className="overview-actions">{actions.map(([target, title, copy]) => <button key={target} onClick={() => onNavigate(target)}><small>OPEN MODULE</small><strong>{title}</strong><span>{copy}</span><b>→</b></button>)}</section>
+    <section className="panel recent-panel"><div className="panel-head"><div><small>TRACEABILITY</small><h2>Latest batches</h2></div><button onClick={() => onNavigate("Batch tracking")}>See batch register →</button></div><div className="batch-table">{batches.map(batch => <article key={batch.id}><span className="batch-icon">KG</span><div><strong>{batch.id}</strong><small>{batch.supplier}</small></div><div><small>TYPE</small><b>{batch.type}</b></div><div><small>RECEIVED</small><b>{kg(batch.weight, 1)}</b></div><div><small>STATUS</small><b className="green">Allocated</b></div><time>{batch.date}</time></article>)}</div></section>
+  </div>;
+}
+
+function BatchTracking({ batches }: { batches: Batch[] }) {
+  const [selected, setSelected] = useState(batches[0]?.id ?? ""); const batch = batches.find(b => b.id === selected) ?? batches[0];
+  return <div className="content"><div className="eyebrow">COOLER / BATCH TRACEABILITY</div><div className="page-heading"><div><h1>Every delivery. Every kilogram.</h1><p>Trace supplier stock from receipt through automatic yield allocation and sale.</p></div><span className="status-pill">{batches.length} ACTIVE BATCHES</span></div><div className="batch-layout"><section className="panel batch-register"><div className="panel-head"><div><small>BATCH REGISTER</small><h2>Supplier deliveries</h2></div></div>{batches.map(item => <button key={item.id} className={selected === item.id ? "active" : ""} onClick={() => setSelected(item.id)}><span className="batch-icon">KG</span><div><strong>{item.id}</strong><small>{item.supplier}</small></div><b>{kg(item.weight, 1)}</b></button>)}</section>{batch && <section className="panel batch-detail"><div className="panel-head"><div><small>FULL TRACE</small><h2>{batch.id}</h2></div><span>ALLOCATED</span></div><div className="batch-facts"><div><small>SUPPLIER</small><strong>{batch.supplier}</strong></div><div><small>MEAT TYPE</small><strong>{batch.type}</strong></div><div><small>SCALE WEIGHT</small><strong>{kg(batch.weight, 1)}</strong></div><div><small>RECEIVED</small><strong>{batch.date}</strong></div></div><div className="trace-line"><span className="done">1<strong>Received</strong><small>{kg(batch.weight, 1)}</small></span><i /><span className="done">2<strong>Auto allocated</strong><small>Baseline ±2%</small></span><i /><span>3<strong>Butcher booking</strong><small>Tracked by ticket</small></span><i /><span>4<strong>POS sale</strong><small>Revenue reconciled</small></span></div></section>}</div></div>;
+}
+
+function CoolerInventory({ estimates }: { estimates: Array<Yield & { expected: number; low: number; high: number }> }) {
+  return <div className="content"><div className="eyebrow">COOLER / LIVE INVENTORY</div><div className="page-heading"><div><h1>Available cooler stock.</h1><p>Expected physical stock created from received batches, with the built-in 2% control range.</p></div><span className="status-pill">{estimates.length} PRODUCTS</span></div><section className="panel"><div className="inventory-row header"><span>PRODUCT</span><span>PHYSICAL KG</span><span>RESERVED</span><span>AVAILABLE</span><span>CONTROL RANGE</span><span>STATUS</span></div>{estimates.map((item, index) => { const reserved = index < 3 ? [2.3, 3.1, 1.5][index] : 0; return <div className="inventory-row" key={item.name}><strong>{item.name}</strong><b>{kg(item.expected)}</b><span>{kg(reserved)}</span><b>{kg(Math.max(0, item.expected - reserved))}</b><span>{kg(item.low)}–{kg(item.high)}</span><em>IN RANGE</em></div>; })}</section></div>;
+}
+
+function ButcherCounter({ estimates }: { estimates: Array<Yield & { expected: number }> }) {
+  const [product, setProduct] = useState(estimates[0]?.name ?? "Rump"); const [ticketWeight, setTicketWeight] = useState(1); const [items, setItems] = useState<Array<{ name: string; weight: number; price: number }>>([]);
+  const selected = estimates.find(item => item.name === product) ?? estimates[0]; const total = items.reduce((sum, item) => sum + item.weight * item.price, 0);
+  function addItem() { if (!selected || ticketWeight <= 0 || ticketWeight > selected.expected) return; setItems([...items, { name: selected.name, weight: ticketWeight, price: selected.price }]); }
+  return <div className="content"><div className="eyebrow">BUTCHER COUNTER / NEW TICKET</div><div className="page-heading"><div><h1>Weigh and reserve the order.</h1><p>Meat moves from available cooler stock to reserved stock until the customer pays.</p></div><span className="status-pill">BT-{10482 + items.length}</span></div><div className="finance-columns"><section className="panel finance-form"><div className="panel-head"><div><small>ADD MEAT</small><h2>Customer order</h2></div></div><div className="finance-form-body"><label className="wide">Product<select value={product} onChange={e => setProduct(e.target.value)}>{estimates.filter(i => i.price > 0).map(i => <option key={i.name}>{i.name}</option>)}</select></label><label>Weight (kg)<input type="number" min="0.01" step="0.01" value={ticketWeight} onChange={e => setTicketWeight(Number(e.target.value))} /></label><label>Price / kg<input value={money(selected?.price ?? 0)} readOnly /></label><button className="primary-action" onClick={addItem}>Add to ticket <span>→</span></button></div></section><section className="panel ticket-panel"><div className="panel-head"><div><small>AWAITING PAYMENT</small><h2>Butcher ticket</h2></div><span>{items.length} ITEMS</span></div>{items.length === 0 ? <div className="empty-stock">Add weighed products to start the customer ticket.</div> : items.map((item, i) => <div className="ticket-item" key={`${item.name}-${i}`}><div><strong>{item.name}</strong><small>{kg(item.weight)} × {money(item.price)}</small></div><b>{money(item.weight * item.price)}</b></div>)}<footer className="ticket-total"><span>TICKET TOTAL</span><strong>{money(total)}</strong></footer><button className="primary-action" disabled={!items.length}>Reserve & send to POS <span>→</span></button></section></div></div>;
 }
 
 const transactionNames: Record<string, string> = { ACCOUNT_SALE: "Account sale", CREDIT_NOTE: "Credit note", DEBIT_NOTE: "Debit note", RETURN: "Return", ACCOUNT_PAYMENT: "Account payment", CASH_PAYOUT: "Cash payout" };
