@@ -11,6 +11,9 @@ async function ensureSchema() {
     env.DB.prepare("INSERT OR IGNORE INTO business_settings (key,value,updated_at) VALUES ('yield_tolerance','2',?)").bind(new Date().toISOString()),
     env.DB.prepare("INSERT OR IGNORE INTO business_settings (key,value,updated_at) VALUES ('vat_rate','15',?)").bind(new Date().toISOString()),
     env.DB.prepare("INSERT OR IGNORE INTO business_settings (key,value,updated_at) VALUES ('default_terms','30',?)").bind(new Date().toISOString()),
+    env.DB.prepare("INSERT OR IGNORE INTO business_settings (key,value,updated_at) VALUES ('low_stock_threshold','5',?)").bind(new Date().toISOString()),
+    env.DB.prepare("INSERT OR IGNORE INTO business_settings (key,value,updated_at) VALUES ('order_lead_time','60',?)").bind(new Date().toISOString()),
+    env.DB.prepare("INSERT OR IGNORE INTO business_settings (key,value,updated_at) VALUES ('receipt_footer','Thank you for supporting George''s Butchery',?)").bind(new Date().toISOString()),
   ]);
 }
 
@@ -49,7 +52,7 @@ export async function POST(request: Request) {
     return Response.json({ ok: true, reference: countNumber, variance });
   }
   if (payload.action === "settings") {
-    const allowed = ["business_name","yield_tolerance","vat_rate","default_terms"]; const entries = Object.entries(payload.settings ?? {}).filter(([key]) => allowed.includes(key));
+    const allowed = ["business_name","yield_tolerance","vat_rate","default_terms","low_stock_threshold","order_lead_time","receipt_footer"]; const entries = Object.entries(payload.settings ?? {}).filter(([key]) => allowed.includes(key));
     if (!entries.length) return Response.json({ error: "No settings supplied" }, { status: 400 });
     await env.DB.batch(entries.map(([key,value]) => env.DB.prepare("INSERT INTO business_settings (key,value,updated_at) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at").bind(key, String(value), now)));
     return Response.json({ ok: true, reference: "SETTINGS-SAVED" });

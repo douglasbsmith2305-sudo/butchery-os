@@ -1,0 +1,3 @@
+CREATE TABLE IF NOT EXISTS butcher_orders (id INTEGER PRIMARY KEY AUTOINCREMENT, order_number TEXT NOT NULL UNIQUE, customer_name TEXT NOT NULL, customer_contact TEXT, requested_time TEXT, notes TEXT, status TEXT NOT NULL DEFAULT 'QUEUED', total REAL NOT NULL DEFAULT 0, source TEXT NOT NULL DEFAULT 'POS', created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS butcher_order_items (id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER NOT NULL, product_id INTEGER NOT NULL, product_name TEXT NOT NULL, quantity REAL NOT NULL, unit TEXT NOT NULL, unit_price REAL NOT NULL, line_total REAL NOT NULL, FOREIGN KEY(order_id) REFERENCES butcher_orders(id));
+CREATE INDEX IF NOT EXISTS butcher_orders_status_idx ON butcher_orders(status,created_at);
