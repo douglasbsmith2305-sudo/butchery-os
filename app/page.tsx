@@ -146,21 +146,22 @@ export default function Home() {
 }
 
 const DEPARTMENT_RULES: Array<[string, string[]]> = [
-  ["Chicken", ["chicken", "wing", "drumstick", "poultry"]],
-  ["Lamb", ["lamb", "mutton"]],
-  ["Game", ["venison", "game", "springbok", "kudu", "impala"]],
-  ["Cold Drinks", ["coke", "cola", "sprite", "fanta", "drink", "juice", "water", "energy"]],
+  ["Chicken", ["chicken", "hoender", "wing", "drumstick", "poultry"]],
+  ["Lamb", ["lamb", "lam", "skaap", "mutton"]],
+  ["Game", ["venison", "game", "wild", "wildsvleis", "springbok", "kudu", "impala"]],
+  ["Cold Drinks", ["coke", "cola", "sprite", "fanta", "drink", "koeldrank", "koel drank", "juice", "water", "energy"]],
   ["Bakery", ["bread", "roll", "bun", "cake", "pie", "bakery"]],
-  ["Takeaways", ["takeaway", "burger", "chips", "meal", "cooked"]],
-  ["Biltong / Deli", ["biltong", "droëwors", "droewors", "deli", "salami", "ham"]],
-  ["Beef", ["beef", "rump", "t-bone", "steak", "brisket", "chuck", "fillet", "mince"]],
+  ["Takeaways", ["takeaway", "wegneem", "burger", "chips", "meal", "cooked"]],
+  ["Biltong / Deli", ["biltong", "droewors", "deli", "salami", "ham"]],
+  ["Beef", ["beef", "bees", "beesvleis", "rump", "t-bone", "steak", "brisket", "chuck", "fillet", "mince"]],
   ["Groceries", ["grocery", "spice", "sauce", "tin", "oil", "flour", "sugar"]],
 ];
 
 function detectDepartment(name: string, supplied: string, valid: string[]) {
   const direct = valid.find((department) => department.toLowerCase() === supplied.trim().toLowerCase());
   if (direct) return direct;
-  const haystack = `${name} ${supplied}`.toLowerCase();
+  const haystack = `${name} ${supplied}`.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  if (/\bplate\s*[1-7]\b/.test(haystack)) return "Takeaways";
   return DEPARTMENT_RULES.find(([, terms]) => terms.some((term) => haystack.includes(term)))?.[0] ?? "Unmapped";
 }
 
