@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Butchery OS — Automatic kilogram control",
-  description: "Automatic meat yield allocation from supplier scale weight to cooler inventory.",
+  title: "George's Butchery OS — Trace every kilogram",
+  description: "George's Butchery stock, cooler, accounts and point-of-sale operating system.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

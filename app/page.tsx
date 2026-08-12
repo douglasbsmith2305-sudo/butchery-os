@@ -80,7 +80,10 @@ export default function Home() {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div className="brand"><span className="brand-mark">B</span><div><strong>BUTCHERY OS</strong><small>KG CONTROL</small></div></div>
+        <div className="brand">
+          <img src="/georges-butchery-logo.webp" alt="George's Butchery — Est 2010" />
+          <div className="brand-label"><strong>OPERATING SYSTEM</strong><small>TRACE EVERY KILOGRAM</small></div>
+        </div>
         <nav aria-label="Main navigation">
           <p>OPERATIONS</p>
           {[
@@ -95,7 +98,7 @@ export default function Home() {
       <main>
         <header className="topbar">
           <button className="mobile-menu" aria-label="Open menu">☰</button>
-          <div><span className="live-dot" /> LEDGER ONLINE</div>
+          <div className="topbar-brand"><strong>GEORGE&apos;S BUTCHERY</strong><span><i className="live-dot" /> LEDGER ONLINE</span></div>
           <div className="shift">WED 12 AUG · MORNING SHIFT</div>
         </header>
 
