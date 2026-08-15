@@ -1,4 +1,4 @@
-import { env } from "cloudflare:workers";
+import { env } from "@/lib/db";
 
 type Line = { productId: number; name: string; quantity: number; unit: string; unitPrice: number };
 
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     if (!lines.length || !["Cash", "Card", "EFT", "Account"].includes(method)) return Response.json({ error: "Add products and choose a payment method" }, { status: 400 });
     let account: { id: number; accountNumber: string; balance: number; creditLimit: number } | null = null;
     if (method === "Account") {
-      account = await env.DB.prepare("SELECT id, account_number AS accountNumber, balance, credit_limit AS creditLimit FROM customer_accounts WHERE account_number=? AND status='ACTIVE'").bind(payload.accountNumber?.trim()).first<typeof account>();
+      account = await env.DB.prepare("SELECT id, account_number AS accountNumber, balance, credit_limit AS creditLimit FROM customer_accounts WHERE account_number=? AND status='ACTIVE'").bind(payload.accountNumber?.trim()).first<{ id: number; accountNumber: string; balance: number; creditLimit: number }>();
       if (!account) return Response.json({ error: "A valid account number is required" }, { status: 400 });
     }
     for (const line of lines) {

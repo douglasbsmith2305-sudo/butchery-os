@@ -1,4 +1,4 @@
-import { env } from "cloudflare:workers";
+import { env } from "@/lib/db";
 
 const DEFAULT_DEPARTMENTS = [
   ["Beef", "BEEF"], ["Chicken", "CHKN"], ["Lamb", "LAMB"], ["Game", "GAME"],

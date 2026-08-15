@@ -1,4 +1,4 @@
-import { env } from "cloudflare:workers";
+import { env } from "@/lib/db";
 
 type OrderLine = { productId: number; name: string; quantity: number; unit: string; unitPrice: number };
 

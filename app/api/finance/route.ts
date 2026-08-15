@@ -1,4 +1,4 @@
-import { env } from "cloudflare:workers";
+import { env } from "@/lib/db";
 
 async function ensureFinanceSchema() {
   const db = env.DB;
