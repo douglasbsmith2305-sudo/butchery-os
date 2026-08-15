@@ -21,12 +21,13 @@ export async function GET() {
 
 export async function POST(request: Request) {
   await ensureSchema();
-  const payload = await request.json() as { action?: string; customerName?: string; customerContact?: string; requestedTime?: string; notes?: string; lines?: OrderLine[]; orderId?: number; status?: string };
+  const payload = await request.json() as { action?: string; customerName?: string; customerContact?: string; requestedTime?: string; notes?: string; lines?: OrderLine[]; orderId?: number; status?: string; source?: string };
   const now = new Date().toISOString();
   if (payload.action === "create") {
     const lines = (payload.lines ?? []).filter(line => line.productId && line.quantity > 0); if (!payload.customerName?.trim() || !lines.length) return Response.json({ error: "Customer name and at least one order item are required" }, { status: 400 });
     const orderNumber = `ORD-${Date.now().toString().slice(-8)}`; const total = lines.reduce((sum,line)=>sum+line.quantity*line.unitPrice,0);
-    const result = await env.DB.prepare("INSERT INTO butcher_orders (order_number,customer_name,customer_contact,requested_time,notes,status,total,source,created_at,updated_at) VALUES (?,?,?,?,?,'QUEUED',?,'POS',?,?)").bind(orderNumber,payload.customerName.trim(),payload.customerContact?.trim()||"",payload.requestedTime||"",payload.notes?.trim()||"",total,now,now).run(); const orderId=Number(result.meta.last_row_id);
+    const source = payload.source === "ONLINE" ? "ONLINE" : "POS";
+    const result = await env.DB.prepare("INSERT INTO butcher_orders (order_number,customer_name,customer_contact,requested_time,notes,status,total,source,created_at,updated_at) VALUES (?,?,?,?,?,'QUEUED',?,?,?,?)").bind(orderNumber,payload.customerName.trim(),payload.customerContact?.trim()||"",payload.requestedTime||"",payload.notes?.trim()||"",total,source,now,now).run(); const orderId=Number(result.meta.last_row_id);
     await env.DB.batch(lines.map(line=>env.DB.prepare("INSERT INTO butcher_order_items (order_id,product_id,product_name,quantity,unit,unit_price,line_total) VALUES (?,?,?,?,?,?,?)").bind(orderId,line.productId,line.name,line.quantity,line.unit,line.unitPrice,line.quantity*line.unitPrice)));
     return Response.json({ ok:true,orderNumber });
   }
