@@ -8,6 +8,7 @@ async function ensureFinanceSchema() {
     db.prepare("CREATE INDEX IF NOT EXISTS supplier_invoice_due_idx ON supplier_invoices(due_date, status)"),
     db.prepare("CREATE TABLE IF NOT EXISTS financial_transactions (id INTEGER PRIMARY KEY AUTOINCREMENT, reference TEXT NOT NULL UNIQUE, transaction_type TEXT NOT NULL, account_name TEXT NOT NULL, amount REAL NOT NULL, reason TEXT NOT NULL, payment_method TEXT, created_at TEXT NOT NULL)"),
     db.prepare("CREATE TABLE IF NOT EXISTS customer_accounts (id INTEGER PRIMARY KEY AUTOINCREMENT, account_number TEXT NOT NULL UNIQUE, name TEXT NOT NULL, credit_limit REAL NOT NULL DEFAULT 0, balance REAL NOT NULL DEFAULT 0, payment_terms_days INTEGER NOT NULL DEFAULT 30, status TEXT NOT NULL DEFAULT 'ACTIVE')"),
+    db.prepare("ALTER TABLE customer_accounts ADD COLUMN IF NOT EXISTS voucher_balance DOUBLE PRECISION NOT NULL DEFAULT 0"),
     db.prepare("CREATE TABLE IF NOT EXISTS customer_purchases (id INTEGER PRIMARY KEY AUTOINCREMENT, account_id INTEGER NOT NULL, invoice_number TEXT NOT NULL UNIQUE, purchase_date TEXT NOT NULL, total REAL NOT NULL, balance REAL NOT NULL, status TEXT NOT NULL DEFAULT 'OPEN', FOREIGN KEY(account_id) REFERENCES customer_accounts(id))"),
     db.prepare("CREATE TABLE IF NOT EXISTS customer_purchase_items (id INTEGER PRIMARY KEY AUTOINCREMENT, purchase_id INTEGER NOT NULL, product_name TEXT NOT NULL, quantity REAL NOT NULL, unit TEXT NOT NULL, unit_price REAL NOT NULL, line_total REAL NOT NULL, FOREIGN KEY(purchase_id) REFERENCES customer_purchases(id))"),
   ]);
@@ -44,7 +45,7 @@ export async function GET() {
     env.DB.prepare("SELECT id, name, payment_terms_days AS paymentTermsDays, contact, active FROM suppliers ORDER BY name").all(),
     env.DB.prepare("SELECT i.id, i.invoice_number AS invoiceNumber, i.delivery_date AS deliveryDate, i.due_date AS dueDate, i.amount, i.balance, i.status, s.id AS supplierId, s.name AS supplierName, s.payment_terms_days AS paymentTermsDays FROM supplier_invoices i JOIN suppliers s ON s.id=i.supplier_id ORDER BY i.due_date, i.id").all(),
     env.DB.prepare("SELECT id, reference, transaction_type AS transactionType, account_name AS accountName, amount, reason, payment_method AS paymentMethod, created_at AS createdAt FROM financial_transactions ORDER BY id DESC LIMIT 100").all(),
-    env.DB.prepare("SELECT id, account_number AS accountNumber, name, credit_limit AS creditLimit, balance, payment_terms_days AS paymentTermsDays, status FROM customer_accounts ORDER BY name").all(),
+    env.DB.prepare("SELECT id, account_number AS accountNumber, name, credit_limit AS creditLimit, balance, voucher_balance AS voucherBalance, payment_terms_days AS paymentTermsDays, status FROM customer_accounts ORDER BY name").all(),
     env.DB.prepare("SELECT id, account_id AS accountId, invoice_number AS invoiceNumber, purchase_date AS purchaseDate, total, balance, status FROM customer_purchases ORDER BY purchase_date DESC, id DESC").all(),
     env.DB.prepare("SELECT id, purchase_id AS purchaseId, product_name AS productName, quantity, unit, unit_price AS unitPrice, line_total AS lineTotal FROM customer_purchase_items ORDER BY id").all(),
   ]);
