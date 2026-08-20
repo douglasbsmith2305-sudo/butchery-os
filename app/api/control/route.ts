@@ -9,6 +9,8 @@ async function ensureSchema() {
     env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_price_history_product_effective ON price_history(product_id,effective_at)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS scale_devices (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, brand TEXT NOT NULL, connector_type TEXT NOT NULL, location TEXT NOT NULL, endpoint TEXT, database_table TEXT, active INTEGER NOT NULL DEFAULT 1, last_sync_at TEXT, last_sync_status TEXT NOT NULL DEFAULT 'NEVER', created_at TEXT NOT NULL)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS scale_sync_jobs (id INTEGER PRIMARY KEY AUTOINCREMENT, device_id INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'PENDING', source TEXT NOT NULL, item_count INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, completed_at TEXT, error TEXT, FOREIGN KEY(device_id) REFERENCES scale_devices(id))"),
+    env.DB.prepare("ALTER TABLE scale_devices ADD COLUMN IF NOT EXISTS scale_group TEXT NOT NULL DEFAULT 'All scales'"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS scheduled_price_changes (id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL, old_price REAL NOT NULL, new_price REAL NOT NULL, reason TEXT NOT NULL, effective_at TEXT NOT NULL, target_group TEXT NOT NULL DEFAULT 'All scales', status TEXT NOT NULL DEFAULT 'SCHEDULED', created_at TEXT NOT NULL)"),
   ]);
   await env.DB.batch([
     env.DB.prepare("INSERT OR IGNORE INTO business_settings (key,value,updated_at) VALUES ('business_name','George''s Butchery',?)").bind(new Date().toISOString()),
@@ -21,6 +23,8 @@ async function ensureSchema() {
     env.DB.prepare("INSERT OR IGNORE INTO business_settings (key,value,updated_at) VALUES ('target_net_margin','8',?)").bind(new Date().toISOString()),
     env.DB.prepare("INSERT OR IGNORE INTO business_settings (key,value,updated_at) VALUES ('monthly_operating_expenses','0',?)").bind(new Date().toISOString()),
   ]);
+  const due=await env.DB.prepare("SELECT id,product_id AS productId,old_price AS oldPrice,new_price AS newPrice,reason,effective_at AS effectiveAt,target_group AS targetGroup FROM scheduled_price_changes WHERE status='SCHEDULED' AND effective_at<=? ORDER BY effective_at,id").bind(new Date().toISOString()).all<{id:number;productId:number;oldPrice:number;newPrice:number;reason:string;effectiveAt:string;targetGroup:string}>();
+  for(const change of due.results){await env.DB.batch([env.DB.prepare("UPDATE products SET selling_price=? WHERE id=?").bind(change.newPrice,change.productId),env.DB.prepare("INSERT INTO price_history (product_id,old_price,new_price,reason,effective_at) VALUES (?,?,?,?,?)").bind(change.productId,change.oldPrice,change.newPrice,change.reason,change.effectiveAt),env.DB.prepare("UPDATE scheduled_price_changes SET status='PUBLISHED' WHERE id=?").bind(change.id)]);const devices=change.targetGroup==="All scales"?await env.DB.prepare("SELECT id FROM scale_devices WHERE active=1").all<{id:number}>():await env.DB.prepare("SELECT id FROM scale_devices WHERE active=1 AND scale_group=?").bind(change.targetGroup).all<{id:number}>();if(devices.results.length)await env.DB.batch(devices.results.flatMap(device=>[env.DB.prepare("INSERT INTO scale_sync_jobs (device_id,status,source,item_count,created_at) VALUES (?,'PENDING','SCHEDULED_PRICE_PUBLISH',1,?)").bind(device.id,change.effectiveAt),env.DB.prepare("UPDATE scale_devices SET last_sync_status='PENDING' WHERE id=?").bind(device.id)]));}
 }
 
 export async function GET() {
@@ -53,7 +57,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   await ensureSchema();
-  const payload = await request.json() as { action?: string; productId?: number; quantity?: number; countedQuantity?: number; reason?: string; settings?: Record<string,string>; prices?: Array<{ productId:number; newPrice:number }> };
+  const payload = await request.json() as { action?: string; productId?: number; quantity?: number; countedQuantity?: number; reason?: string; settings?: Record<string,string>; prices?: Array<{ productId:number; newPrice:number }>; effectiveAt?:string; targetGroup?:string };
   const now = new Date().toISOString();
   if (payload.action === "waste") {
     const product = await env.DB.prepare("SELECT id,name,quantity,cost_price AS costPrice FROM products WHERE id=?").bind(payload.productId).first<{ id: number; name: string; quantity: number; costPrice: number }>(); const quantity = Number(payload.quantity) || 0;
@@ -77,8 +81,9 @@ export async function POST(request: Request) {
   if (payload.action === "publish_prices") {
     const prices=(payload.prices??[]).filter(item=>item.productId&&Number(item.newPrice)>0); if(!prices.length) return Response.json({error:"No valid product prices supplied"},{status:400});
     const products=await env.DB.prepare(`SELECT id,selling_price AS sellingPrice FROM products WHERE id IN (${prices.map(()=>"?").join(",")})`).bind(...prices.map(p=>p.productId)).all<{id:number;sellingPrice:number}>(); const current=new Map(products.results.map(p=>[p.id,p.sellingPrice]));
+    const effectiveAt=payload.effectiveAt?new Date(payload.effectiveAt).toISOString():now;const targetGroup=payload.targetGroup?.trim()||"All scales";if(new Date(effectiveAt).getTime()>Date.now()+30000){await env.DB.batch(prices.flatMap(item=>{const old=current.get(item.productId);return old===undefined?[]:[env.DB.prepare("INSERT INTO scheduled_price_changes (product_id,old_price,new_price,reason,effective_at,target_group,status,created_at) VALUES (?,?,?,?,?,?,'SCHEDULED',?)").bind(item.productId,old,item.newPrice,payload.reason?.trim()||"Scheduled owner pricing update",effectiveAt,targetGroup,now)];}));return Response.json({ok:true,reference:`PRICE-SCHEDULE-${Date.now().toString().slice(-8)}`,updated:prices.length,scheduled:true,effectiveAt,targetGroup,scalesQueued:0});}
     await env.DB.batch(prices.flatMap(item=>{const old=current.get(item.productId);if(old===undefined)return[];return[env.DB.prepare("UPDATE products SET selling_price=? WHERE id=?").bind(item.newPrice,item.productId),env.DB.prepare("INSERT INTO price_history (product_id,old_price,new_price,reason,effective_at) VALUES (?,?,?,?,?)").bind(item.productId,old,item.newPrice,payload.reason?.trim()||"Owner pricing update",now)];}));
-    const scaleDevices=await env.DB.prepare("SELECT id FROM scale_devices WHERE active=1 ORDER BY id").all<{id:number}>();
+    const scaleDevices=targetGroup==="All scales"?await env.DB.prepare("SELECT id FROM scale_devices WHERE active=1 ORDER BY id").all<{id:number}>():await env.DB.prepare("SELECT id FROM scale_devices WHERE active=1 AND scale_group=? ORDER BY id").bind(targetGroup).all<{id:number}>();
     if(scaleDevices.results.length){await env.DB.batch(scaleDevices.results.flatMap(device=>[env.DB.prepare("INSERT INTO scale_sync_jobs (device_id,status,source,item_count,created_at) VALUES (?,'PENDING','GLOBAL_PRICE_PUBLISH',?,?)").bind(device.id,prices.length,now),env.DB.prepare("UPDATE scale_devices SET last_sync_status='PENDING' WHERE id=?").bind(device.id)]));}
     return Response.json({ok:true,reference:`PRICE-${Date.now().toString().slice(-8)}`,updated:prices.length,scalesQueued:scaleDevices.results.length});
   }
