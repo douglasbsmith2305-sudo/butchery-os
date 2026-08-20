@@ -7,6 +7,8 @@ async function ensureSchema() {
     env.DB.prepare("CREATE TABLE IF NOT EXISTS business_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL)"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS price_history (id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL, old_price REAL NOT NULL, new_price REAL NOT NULL, reason TEXT NOT NULL, effective_at TEXT NOT NULL)"),
     env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_price_history_product_effective ON price_history(product_id,effective_at)"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS scale_devices (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, brand TEXT NOT NULL, connector_type TEXT NOT NULL, location TEXT NOT NULL, endpoint TEXT, database_table TEXT, active INTEGER NOT NULL DEFAULT 1, last_sync_at TEXT, last_sync_status TEXT NOT NULL DEFAULT 'NEVER', created_at TEXT NOT NULL)"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS scale_sync_jobs (id INTEGER PRIMARY KEY AUTOINCREMENT, device_id INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'PENDING', source TEXT NOT NULL, item_count INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, completed_at TEXT, error TEXT, FOREIGN KEY(device_id) REFERENCES scale_devices(id))"),
   ]);
   await env.DB.batch([
     env.DB.prepare("INSERT OR IGNORE INTO business_settings (key,value,updated_at) VALUES ('business_name','George''s Butchery',?)").bind(new Date().toISOString()),
@@ -76,7 +78,9 @@ export async function POST(request: Request) {
     const prices=(payload.prices??[]).filter(item=>item.productId&&Number(item.newPrice)>0); if(!prices.length) return Response.json({error:"No valid product prices supplied"},{status:400});
     const products=await env.DB.prepare(`SELECT id,selling_price AS sellingPrice FROM products WHERE id IN (${prices.map(()=>"?").join(",")})`).bind(...prices.map(p=>p.productId)).all<{id:number;sellingPrice:number}>(); const current=new Map(products.results.map(p=>[p.id,p.sellingPrice]));
     await env.DB.batch(prices.flatMap(item=>{const old=current.get(item.productId);if(old===undefined)return[];return[env.DB.prepare("UPDATE products SET selling_price=? WHERE id=?").bind(item.newPrice,item.productId),env.DB.prepare("INSERT INTO price_history (product_id,old_price,new_price,reason,effective_at) VALUES (?,?,?,?,?)").bind(item.productId,old,item.newPrice,payload.reason?.trim()||"Owner pricing update",now)];}));
-    return Response.json({ok:true,reference:`PRICE-${Date.now().toString().slice(-8)}`,updated:prices.length});
+    const scaleDevices=await env.DB.prepare("SELECT id FROM scale_devices WHERE active=1 ORDER BY id").all<{id:number}>();
+    if(scaleDevices.results.length){await env.DB.batch(scaleDevices.results.flatMap(device=>[env.DB.prepare("INSERT INTO scale_sync_jobs (device_id,status,source,item_count,created_at) VALUES (?,'PENDING','GLOBAL_PRICE_PUBLISH',?,?)").bind(device.id,prices.length,now),env.DB.prepare("UPDATE scale_devices SET last_sync_status='PENDING' WHERE id=?").bind(device.id)]));}
+    return Response.json({ok:true,reference:`PRICE-${Date.now().toString().slice(-8)}`,updated:prices.length,scalesQueued:scaleDevices.results.length});
   }
   return Response.json({ error: "Unknown control action" }, { status: 400 });
 }
