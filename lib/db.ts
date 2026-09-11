@@ -67,7 +67,7 @@ class Statement {
   async run(): Promise<RunResult> {
     let sql = postgresSql(this.source);
     const insertTable = sql.match(/^\s*INSERT\s+INTO\s+["`]?([a-z_][a-z0-9_]*)/i)?.[1]?.toLowerCase();
-    const returnsId = new Set(["pos_sales", "customer_purchases", "butcher_orders", "payroll_runs", "scale_sync_jobs"]);
+    const returnsId = new Set(["pos_sales", "customer_purchases", "butcher_orders", "payroll_runs", "scale_sync_jobs", "stock_receipts"]);
     if (insertTable && returnsId.has(insertTable) && !/\bRETURNING\b/i.test(sql)) sql = `${sql.replace(/;\s*$/, "")} RETURNING id`;
     const rows = (await client().query(sql, this.values)) as unknown as Array<{ id?: number }>;
     const id = Number(rows[0]?.id ?? 0);
