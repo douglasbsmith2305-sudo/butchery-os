@@ -15,6 +15,7 @@ test("universal receiving supports searchable mixed-unit stock intake", async ()
   assert.match(page, /Product, SKU, barcode or department/);
   assert.match(page, /selected\.unit\.toLowerCase\(\)!=="kg"&&!Number\.isInteger/);
   assert.match(page, /Receive all products/);
+  assert.match(page, /\["Pork", \["pork", "vark", "varkvleis"/);
   assert.match(page, /Add the invoice value to supplier accounts and payment calendar/);
   assert.match(styles, /\.receiving-layout/);
   assert.match(styles, /@media\(max-width:760px\).*\.receiving-fields/s);

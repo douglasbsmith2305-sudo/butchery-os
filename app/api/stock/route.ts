@@ -1,7 +1,7 @@
 import { env } from "@/lib/db";
 
 const DEFAULT_DEPARTMENTS = [
-  ["Beef", "BEEF"], ["Chicken", "CHKN"], ["Lamb", "LAMB"], ["Game", "GAME"],
+  ["Beef", "BEEF"], ["Pork", "PORK"], ["Chicken", "CHKN"], ["Lamb", "LAMB"], ["Game", "GAME"],
   ["Groceries", "GROC"], ["Cold Drinks", "DRNK"], ["Bakery", "BAKE"],
   ["Takeaways", "TAKE"], ["Biltong / Deli", "DELI"], ["Unmapped", "UNMP"],
 ];

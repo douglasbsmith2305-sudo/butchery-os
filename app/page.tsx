@@ -403,6 +403,7 @@ function SupplierInvoiceList({ invoices }: { invoices: SupplierInvoice[] }) { re
 function TransactionRegister({ transactions }: { transactions: FinanceTransaction[] }) { return <section className="panel finance-register"><div className="panel-head"><div><small>AUDIT TRAIL</small><h2>Recent POS documents</h2></div><span>{transactions.length} entries</span></div><div className="finance-list">{transactions.map((item) => <article key={item.id}><div><strong>{item.reference}</strong><small>{transactionNames[item.transactionType]}</small></div><div className="grow"><small>ACCOUNT / REASON</small><b>{item.accountName} · {item.reason}</b></div><div><small>AMOUNT</small><b>{money(item.amount)}</b></div></article>)}{!transactions.length && <div className="empty-stock">No account documents posted yet.</div>}</div></section>; }
 
 const DEPARTMENT_RULES: Array<[string, string[]]> = [
+  ["Pork", ["pork", "vark", "varkvleis", "pork belly", "gammon", "rasher"]],
   ["Chicken", ["chicken", "hoender", "wing", "drumstick", "poultry"]],
   ["Lamb", ["lamb", "lam", "skaap", "mutton"]],
   ["Game", ["venison", "game", "wild", "wildsvleis", "springbok", "kudu", "impala"]],
@@ -435,7 +436,7 @@ function parseCsvLine(line: string) {
 }
 
 function StockMaster() {
-  const defaults = ["Beef", "Chicken", "Lamb", "Game", "Groceries", "Cold Drinks", "Bakery", "Takeaways", "Biltong / Deli", "Unmapped"];
+  const defaults = ["Beef", "Pork", "Chicken", "Lamb", "Game", "Groceries", "Cold Drinks", "Bakery", "Takeaways", "Biltong / Deli", "Unmapped"];
   const [departments, setDepartments] = useState(defaults);
   const [products, setProducts] = useState<StockProduct[]>([]);
   const [preview, setPreview] = useState<StockProduct[]>([]);
