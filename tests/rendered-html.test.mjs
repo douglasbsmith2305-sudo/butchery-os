@@ -57,3 +57,22 @@ test("back office controls target margins and price decrease approvals", async (
   assert.match(control, /target_margin_percent/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS price_decrease_approvals/);
 });
+
+test("four bulk meat inputs run automatic block tests while other stock remains direct", async () => {
+  const [profiles, page, route, migration] = await Promise.all([
+    projectFile("lib/block-tests.ts"),
+    projectFile("app/page.tsx"),
+    projectFile("app/api/receiving/route.ts"),
+    projectFile("drizzle/0012_automatic_block_tests.sql"),
+  ]);
+
+  for (const name of ["Beef Hind Quarter", "Beef Front Quarter", "Lamb Carcass", "Pork Carcass"]) assert.match(profiles, new RegExp(name));
+  assert.equal((profiles.match(/\{ outputSku:.*percent:/g) ?? []).length, 36);
+  assert.match(page, /AUTOMATIC YIELD PREVIEW/);
+  assert.match(page, /DIRECT ITEM STOCK/);
+  assert.match(route, /AUTO_BLOCK_INPUT/);
+  assert.match(route, /AUTO_BLOCK_OUTPUT/);
+  assert.match(route, /outputQuantity\*\.98/);
+  assert.match(route, /outputQuantity\*1\.02/);
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS block_test_allocations/);
+});
