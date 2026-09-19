@@ -14,6 +14,8 @@ type Count = { id:number;countNumber:string;productId:number;productName:string;
 type ScaleDevice = { id:number;name:string;brand:string;location:string;scaleGroup:string;lastSyncStatus:string };
 type PayrollEmployee = { id:number;employeeNumber:string;fullName:string;jobTitle:string;baseSalary:number;meatBenefit:number;accountNumber:string };
 type PayrollRun = { id:number;payrollNumber:string;employeeId:number;fullName:string;payPeriod:string;netPay:number;paid:number };
+type CommissionStaff = { id:number;employeeId:number;employeeNumber:string;fullName:string;jobTitle:string;staffCode:number;customRatePercent:number|null };
+type CommissionSummary = { staffId:number;netExVat:number;commissionAmount:number;entryCount:number };
 type ControlReport = { revenue:number;stockValue:number;retailValue:number;wasteKg:number;wasteValue:number;supplierBalance:number;productCount:number };
 type Snapshot = {
   products: Product[];
@@ -27,6 +29,9 @@ type Snapshot = {
   devices: ScaleDevice[];
   employees: PayrollEmployee[];
   payrollRuns: PayrollRun[];
+  commissionRate: number;
+  commissionStaff: CommissionStaff[];
+  commissionSummary: CommissionSummary[];
   settings: Record<string,string>;
   report: ControlReport;
 };
@@ -53,8 +58,8 @@ export default function SandboxWorkspace({section}:{section:string}){
   async function loadSnapshot(){
     setLoading(true); setMessage("Reading current live data. No changes are being made.");
     try{
-      const [control,finance,orders,payroll,receiving,scales]=await Promise.all([
-        readJson("/api/control"),readJson("/api/finance"),readJson("/api/orders"),readJson("/api/payroll"),readJson("/api/receiving"),readJson("/api/scales")
+      const [control,finance,orders,payroll,receiving,scales,commission]=await Promise.all([
+        readJson("/api/control"),readJson("/api/finance"),readJson("/api/orders"),readJson("/api/payroll"),readJson("/api/receiving"),readJson("/api/scales"),readJson("/api/commission")
       ]);
       const next:Snapshot={
         products:(receiving.products??control.products??[]) as Product[],
@@ -68,6 +73,9 @@ export default function SandboxWorkspace({section}:{section:string}){
         devices:(scales.devices??[]) as ScaleDevice[],
         employees:(payroll.employees??[]) as PayrollEmployee[],
         payrollRuns:(payroll.runs??[]) as PayrollRun[],
+        commissionRate:Number((commission.settings as { defaultRatePercent?:number }|undefined)?.defaultRatePercent??5),
+        commissionStaff:(commission.staff??[]) as CommissionStaff[],
+        commissionSummary:(commission.summary??[]) as CommissionSummary[],
         settings:(control.settings??{}) as Record<string,string>,
         report:(control.report??blankReport) as ControlReport,
       };
@@ -101,6 +109,7 @@ export default function SandboxWorkspace({section}:{section:string}){
       :section==="Batch tracking"?<SandboxBatches data={scenario}/>
       :section==="Accounts & Calendar"?<SandboxAccounts {...shared}/>
       :section==="Payroll"?<SandboxPayroll {...shared}/>
+      :section==="Commission"?<SandboxCommission {...shared}/>
       :section==="Reports"?<SandboxReports data={scenario}/>
       :section==="Settings"?<SandboxSettings {...shared}/>
       :<SandboxOverview data={scenario}/>} 
@@ -157,6 +166,13 @@ function SandboxBatches({data}:{data:Snapshot}){return <><div className="eyebrow
 function SandboxAccounts({data,setData,setMessage}:MutatingProps){function payInvoice(id:number){setData(current=>current?{...current,invoices:current.invoices.map(i=>i.id===id?{...i,balance:0,status:"PAID"}:i)}:current);setMessage("Supplier invoice marked paid in the scenario only.");}function clearAccount(id:number){setData(current=>current?{...current,accounts:current.accounts.map(a=>a.id===id?{...a,balance:0}:a)}:current);setMessage("Customer account cleared in the scenario only.");}return <><div className="eyebrow">SANDBOX / BACK OFFICE / ACCOUNTS & CALENDAR</div><div className="page-heading"><div><h1>Test cash-flow decisions.</h1><p>Settle debtors or supplier invoices without creating payments or ledger entries.</p></div></div><div className="sandbox-two"><section className="panel"><div className="panel-head"><div><small>DEBTORS</small><h2>Customer accounts</h2></div></div>{data.accounts.map(a=><div className="sandbox-account" key={a.id}><div><strong>{a.name}</strong><small>{a.accountNumber}</small></div><b>{money(a.balance)}</b><button disabled={!a.balance} onClick={()=>clearAccount(a.id)}>Simulate payment</button></div>)}</section><section className="panel"><div className="panel-head"><div><small>PAYMENT CALENDAR</small><h2>Supplier invoices</h2></div></div>{data.invoices.map(i=><div className="sandbox-account" key={i.id}><div><strong>{i.supplierName}</strong><small>{i.invoiceNumber} · due {i.dueDate}</small></div><b>{money(i.balance)}</b><button disabled={!i.balance} onClick={()=>payInvoice(i.id)}>Simulate paid</button></div>)}</section></div></>}
 
 function SandboxPayroll({data,setData,setMessage}:MutatingProps){function toggle(id:number){setData(current=>current?{...current,payrollRuns:current.payrollRuns.map(r=>r.id===id?{...r,paid:r.paid?0:1}:r)}:current);setMessage("Payroll status changed in the scenario only; no staff account was settled.");}return <><div className="eyebrow">SANDBOX / BACK OFFICE / PAYROLL</div><div className="page-heading"><div><h1>Test payroll status.</h1><p>Review packages and model who is paid without clearing live staff accounts.</p></div></div><section className="panel payroll-status">{data.payrollRuns.length?<><div className="payroll-status-row header"><span>EMPLOYEE</span><span>PERIOD</span><span>NET PAY</span><span>STATUS</span></div>{data.payrollRuns.map(r=><div className="payroll-status-row" key={r.id}><div><strong>{r.fullName||data.employees.find(e=>e.id===r.employeeId)?.fullName||r.payrollNumber}</strong><small>{r.payrollNumber}</small></div><span>{r.payPeriod}</span><b>{money(r.netPay)}</b><button className={r.paid?"paid":""} onClick={()=>toggle(r.id)}>{r.paid?"✓ Paid":"Mark paid"}</button></div>)}</>:<div className="sandbox-empty">No payroll runs were present in this snapshot.</div>}</section></>}
+
+function SandboxCommission({data,setData,setMessage}:MutatingProps){
+  const totalNet=data.commissionSummary.reduce((sum,row)=>sum+Number(row.netExVat),0);
+  const projected=totalNet*data.commissionRate/100;
+  function changeRate(value:number){setData(current=>current?{...current,commissionRate:Math.min(100,Math.max(0,value))}:current);setMessage("Commission rate changed inside the scenario only.");}
+  return <><div className="eyebrow">SANDBOX / BACK OFFICE / COMMISSION</div><div className="page-heading"><div><h1>Test the commission model.</h1><p>Change the VAT-exclusive rate and compare staff outcomes without altering live commission settings or transactions.</p></div><span className="status-pill">NO LIVE WRITES</span></div><section className="commission-target"><div><small>SCENARIO COMMISSION RATE</small><h2>Commission on sales excluding VAT</h2><p>The live default is copied into this sandbox. Staff overrides remain visible below.</p></div><label><input type="number" min="0" max="100" step="0.1" value={data.commissionRate} onChange={event=>changeRate(Number(event.target.value))}/><b>%</b></label></section><section className="sandbox-kpis"><article><small>VAT-EXCLUSIVE SALES</small><strong>{money(totalNet)}</strong></article><article><small>SCENARIO COMMISSION</small><strong>{money(projected)}</strong><span>At {data.commissionRate.toFixed(2)}%</span></article><article><small>STAFF CODES</small><strong>{data.commissionStaff.length}</strong><span>Scale aliases remain simulated</span></article><article><small>TRANSACTIONS</small><strong>{data.commissionSummary.reduce((sum,row)=>sum+Number(row.entryCount),0)}</strong><span>From the live snapshot</span></article></section><section className="panel"><div className="panel-head"><div><small>STAFF PROJECTION</small><h2>Commission by butcher</h2></div></div>{data.commissionStaff.map(staff=>{const totals=data.commissionSummary.find(row=>row.staffId===staff.id);const rate=staff.customRatePercent??data.commissionRate;const net=Number(totals?.netExVat??0);return <div className="commission-ledger-row" key={staff.id}><div><strong>{staff.fullName}</strong><small>{staff.employeeNumber} · scale code {staff.staffCode}</small></div><span>{money(net)} excl. VAT</span><b>{rate.toFixed(2)}%</b><strong>{money(net*rate/100)}</strong></div>})}</section></>;
+}
 
 function SandboxReports({data}:{data:Snapshot}){const departments=Object.values(data.products.reduce<Record<string,{name:string;cost:number;retail:number;quantity:number}>>((map,p)=>{const entry=map[p.department]??{name:p.department,cost:0,retail:0,quantity:0};entry.cost+=p.costPrice*p.quantity;entry.retail+=p.sellingPrice*p.quantity;entry.quantity+=p.quantity;map[p.department]=entry;return map;},{})).sort((a,b)=>b.retail-a.retail);return <><div className="eyebrow">SANDBOX / BACK OFFICE / REPORTS</div><div className="page-heading"><div><h1>Scenario profitability report.</h1><p>All figures recalculate from the current sandbox model.</p></div></div><section className="panel sandbox-table"><div className="sandbox-report-row header"><span>DEPARTMENT</span><span>QUANTITY</span><span>COST VALUE</span><span>RETAIL VALUE</span><span>GROSS MARGIN</span></div>{departments.map(d=><div className="sandbox-report-row" key={d.name}><strong>{d.name}</strong><span>{quantity(d.quantity,"units/kg")}</span><span>{money(d.cost)}</span><b>{money(d.retail)}</b><em>{d.retail?`${((d.retail-d.cost)/d.retail*100).toFixed(1)}%`:"0%"}</em></div>)}</section></>}
 

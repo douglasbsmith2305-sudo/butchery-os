@@ -14,6 +14,7 @@ async function ensureSchema() {
     env.DB.prepare("ALTER TABLE scale_product_mappings ADD COLUMN IF NOT EXISTS tare_kg DOUBLE PRECISION NOT NULL DEFAULT 0"),
     env.DB.prepare("ALTER TABLE scale_product_mappings ADD COLUMN IF NOT EXISTS shelf_life_days INTEGER NOT NULL DEFAULT 4"),
     env.DB.prepare("ALTER TABLE scale_product_mappings ADD COLUMN IF NOT EXISTS packed_on INTEGER NOT NULL DEFAULT 1"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS commission_staff (id INTEGER PRIMARY KEY AUTOINCREMENT, employee_id INTEGER NOT NULL UNIQUE, staff_code TEXT NOT NULL UNIQUE, custom_rate_percent REAL, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)"),
   ]);
   const now=new Date().toISOString();
   await env.DB.prepare("INSERT OR IGNORE INTO scale_devices (name,brand,connector_type,location,endpoint,database_table,active,last_sync_status,created_at) VALUES ('Front Counter Scale 1','DIGI / Teraoka','MYSQL_BRIDGE','Butcher counter','','plu_master',1,'NEVER',?)").bind(now).run();
@@ -25,28 +26,34 @@ async function ensureMappings(deviceId:number) {
   const now=new Date().toISOString();
   const products=await env.DB.prepare("SELECT id,name FROM products WHERE LOWER(unit)='kg' ORDER BY id").all<{id:number;name:string}>();
   await env.DB.batch(products.results.map(product=>env.DB.prepare("INSERT INTO scale_product_mappings (device_id,product_id,plu,barcode_prefix,label_name,enabled,updated_at) VALUES (?,?,?,?,?,1,?) ON CONFLICT(device_id,product_id) DO UPDATE SET label_name=excluded.label_name,updated_at=excluded.updated_at").bind(deviceId,product.id,String(1000+product.id),"20",product.name.slice(0,30),now)));
-  return products.results.length;
+  const staff=await env.DB.prepare("SELECT COUNT(*) AS count FROM commission_staff WHERE active=1").first<{count:number}>();
+  return products.results.length*(Number(staff?.count??0)+1);
 }
 
 function csvCell(value:unknown){const text=String(value??"");return /[",\n]/.test(text)?`"${text.replace(/"/g,'""')}"`:text;}
+type CommissionStaff={id:number;staffCode:string;fullName:string;employeeNumber:string};
+type ExpandedScaleItem=Record<string,unknown>&{plu:unknown;commissionStaffId:number|null;staffCode:string;staffName:string};
+const aliasPlu=(base:unknown,staffCode:string)=>{const normalized=String(base??"").replace(/\D/g,"");return normalized.length&&normalized.length<=4?`${staffCode}${normalized.padStart(4,"0")}`:null;};
+function expandedItems(mappings:Record<string,unknown>[],staff:CommissionStaff[]):ExpandedScaleItem[]{return mappings.flatMap(item=>[{...item,commissionStaffId:null,staffCode:"",staffName:"Unassigned"} as ExpandedScaleItem,...staff.flatMap(member=>{const plu=aliasPlu(item.plu,member.staffCode);return plu?[{...item,plu,commissionStaffId:member.id,staffCode:member.staffCode,staffName:member.fullName} as ExpandedScaleItem]:[];})]);}
 
 export async function GET(request:Request) {
   await ensureSchema(); const url=new URL(request.url); const deviceId=Number(url.searchParams.get("device")); const format=url.searchParams.get("format");
   const scanned=url.searchParams.get("barcode")?.replace(/\D/g,"");
-  if(scanned){const rows=await env.DB.prepare(`${productSelect} WHERE m.enabled=1`).all<Record<string,unknown>>();for(const item of rows.results){const decoded=decodeWeightedBarcode(scanned,{barcodePrefix:String(item.barcodePrefix),plu:String(item.plu),barcodeMode:String(item.barcodeMode),sellingPrice:Number(item.sellingPrice)});if(decoded){const stock=await env.DB.prepare("SELECT quantity FROM products WHERE id=?").bind(item.productId).first<{quantity:number}>();return Response.json({ok:true,product:{id:item.productId,name:item.name,unit:item.unit,sellingPrice:item.sellingPrice,quantityAvailable:Number(stock?.quantity??0)},...decoded,barcode:scanned});}}return Response.json({error:"Weighted scale barcode not recognised"},{status:404});}
+  if(scanned){const [rows,staffRows]=await Promise.all([env.DB.prepare(`${productSelect} WHERE m.enabled=1`).all<Record<string,unknown>>(),env.DB.prepare("SELECT c.id,c.staff_code AS staffCode,e.full_name AS fullName,e.employee_number AS employeeNumber FROM commission_staff c JOIN payroll_employees e ON e.id=c.employee_id WHERE c.active=1 ORDER BY CAST(c.staff_code AS INTEGER)").all<CommissionStaff>()]);for(const item of expandedItems(rows.results,staffRows.results)){const decoded=decodeWeightedBarcode(scanned,{barcodePrefix:String(item.barcodePrefix),plu:String(item.plu),barcodeMode:String(item.barcodeMode),sellingPrice:Number(item.sellingPrice)});if(decoded){const stock=await env.DB.prepare("SELECT quantity FROM products WHERE id=?").bind(item.productId).first<{quantity:number}>();return Response.json({ok:true,product:{id:item.productId,name:item.name,unit:item.unit,sellingPrice:item.sellingPrice,quantityAvailable:Number(stock?.quantity??0)},staff:item.commissionStaffId?{id:item.commissionStaffId,staffCode:item.staffCode,fullName:item.staffName}:null,...decoded,barcode:scanned});}}return Response.json({error:"Weighted scale barcode not recognised"},{status:404});}
   if(deviceId)await ensureMappings(deviceId);
   if(deviceId&&(format==="csv"||format==="json")){
     const device=await env.DB.prepare("SELECT id,name,brand,connector_type AS connectorType,location,endpoint,database_table AS databaseTable,last_sync_at AS lastSyncAt,last_sync_status AS lastSyncStatus FROM scale_devices WHERE id=? AND active=1").bind(deviceId).first<Record<string,unknown>>();
     if(!device)return Response.json({error:"Scale not found"},{status:404});
-    const mappings=await env.DB.prepare(`${productSelect} WHERE m.device_id=? AND m.enabled=1 ORDER BY CAST(m.plu AS INTEGER),p.name`).bind(deviceId).all<Record<string,unknown>>();
+    const [mappings,staffRows]=await Promise.all([env.DB.prepare(`${productSelect} WHERE m.device_id=? AND m.enabled=1 ORDER BY CAST(m.plu AS INTEGER),p.name`).bind(deviceId).all<Record<string,unknown>>(),env.DB.prepare("SELECT c.id,c.staff_code AS staffCode,e.full_name AS fullName,e.employee_number AS employeeNumber FROM commission_staff c JOIN payroll_employees e ON e.id=c.employee_id WHERE c.active=1 ORDER BY CAST(c.staff_code AS INTEGER)").all<CommissionStaff>()]);
+    const scaleItems=expandedItems(mappings.results,staffRows.results);
     if(format==="csv"){
-      const headers=["PLU","SKU","BarcodePrefix","LabelName","Department","Unit","PricePerKg"];
-      const rows=mappings.results.map(item=>[item.plu,item.sku,item.barcodePrefix,item.labelName,item.department,item.unit,Number(item.sellingPrice).toFixed(2)]);
+      const headers=["PLU","SKU","BarcodePrefix","LabelName","Department","Unit","PricePerKg","StaffCode","StaffName"];
+      const rows=scaleItems.map(item=>[item.plu,item.sku,item.barcodePrefix,item.labelName,item.department,item.unit,Number(item.sellingPrice).toFixed(2),item.staffCode,item.staffName]);
       const csv=[headers,...rows].map(row=>row.map(csvCell).join(",")).join("\r\n");
       return new Response(csv,{headers:{"content-type":"text/csv; charset=utf-8","content-disposition":`attachment; filename="scale-${deviceId}-price-book.csv"`}});
     }
     const job=await env.DB.prepare("SELECT id,status,source,item_count AS itemCount,created_at AS createdAt FROM scale_sync_jobs WHERE device_id=? AND status='PENDING' ORDER BY id LIMIT 1").bind(deviceId).first();
-    return Response.json({device,job,generatedAt:new Date().toISOString(),items:mappings.results.map(item=>({productId:item.productId,plu:item.plu,sku:item.sku,barcodePrefix:item.barcodePrefix,barcodeMode:item.barcodeMode,labelName:item.labelName,labelFormat:item.labelFormat,tareKg:item.tareKg,shelfLifeDays:item.shelfLifeDays,packedOn:Boolean(item.packedOn),department:item.department,unit:item.unit,pricePerKg:item.sellingPrice}))});
+    return Response.json({device,job,generatedAt:new Date().toISOString(),items:scaleItems.map(item=>({productId:item.productId,plu:item.plu,sku:item.sku,barcodePrefix:item.barcodePrefix,barcodeMode:item.barcodeMode,labelName:item.labelName,labelFormat:item.labelFormat,tareKg:item.tareKg,shelfLifeDays:item.shelfLifeDays,packedOn:Boolean(item.packedOn),department:item.department,unit:item.unit,pricePerKg:item.sellingPrice,commissionStaffId:item.commissionStaffId,staffCode:item.staffCode,staffName:item.staffName}))});
   }
   const activeDevices=await env.DB.prepare("SELECT id FROM scale_devices WHERE active=1 ORDER BY id").all<{id:number}>();
   for(const device of activeDevices.results)await ensureMappings(device.id);

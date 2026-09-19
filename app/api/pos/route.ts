@@ -1,6 +1,6 @@
 import { env } from "@/lib/db";
 
-type Line = { productId: number; name: string; quantity: number; unit: string; unitPrice: number };
+type Line = { productId: number; name: string; quantity: number; unit: string; unitPrice: number; commissionStaffId?:number|null };
 
 async function ensureSchema() {
   const db = env.DB;
@@ -13,7 +13,15 @@ async function ensureSchema() {
     db.prepare("CREATE TABLE IF NOT EXISTS pos_sales (id INTEGER PRIMARY KEY AUTOINCREMENT, sale_number TEXT NOT NULL UNIQUE, payment_method TEXT NOT NULL, account_number TEXT, subtotal REAL NOT NULL, total REAL NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL)"),
     db.prepare("CREATE TABLE IF NOT EXISTS pos_sale_items (id INTEGER PRIMARY KEY AUTOINCREMENT, sale_id INTEGER NOT NULL, product_id INTEGER NOT NULL, product_name TEXT NOT NULL, quantity REAL NOT NULL, unit TEXT NOT NULL, unit_price REAL NOT NULL, line_total REAL NOT NULL, FOREIGN KEY(sale_id) REFERENCES pos_sales(id))"),
     db.prepare("CREATE TABLE IF NOT EXISTS till_movements (id INTEGER PRIMARY KEY AUTOINCREMENT, reference TEXT NOT NULL, movement_type TEXT NOT NULL, amount REAL NOT NULL, payment_method TEXT NOT NULL, note TEXT, created_at TEXT NOT NULL)"),
+    db.prepare("CREATE TABLE IF NOT EXISTS commission_settings (id INTEGER PRIMARY KEY, default_rate_percent REAL NOT NULL DEFAULT 5, calculation_basis TEXT NOT NULL DEFAULT 'EXCLUDING_VAT', updated_at TEXT NOT NULL)"),
+    db.prepare("CREATE TABLE IF NOT EXISTS commission_staff (id INTEGER PRIMARY KEY AUTOINCREMENT, employee_id INTEGER NOT NULL UNIQUE, staff_code TEXT NOT NULL UNIQUE, custom_rate_percent REAL, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)"),
+    db.prepare("CREATE TABLE IF NOT EXISTS commission_entries (id INTEGER PRIMARY KEY AUTOINCREMENT, sale_id INTEGER, sale_item_id INTEGER, staff_id INTEGER NOT NULL, product_id INTEGER NOT NULL, product_name TEXT NOT NULL, quantity REAL NOT NULL, gross_amount REAL NOT NULL, net_ex_vat REAL NOT NULL, rate_percent REAL NOT NULL, commission_amount REAL NOT NULL, entry_type TEXT NOT NULL DEFAULT 'EARNED', reference TEXT NOT NULL, created_at TEXT NOT NULL)"),
+    db.prepare("ALTER TABLE pos_sale_items ADD COLUMN IF NOT EXISTS commission_staff_id INTEGER"),
+    db.prepare("ALTER TABLE pos_sale_items ADD COLUMN IF NOT EXISTS commission_rate_percent DOUBLE PRECISION"),
+    db.prepare("ALTER TABLE pos_sale_items ADD COLUMN IF NOT EXISTS commission_net_ex_vat DOUBLE PRECISION"),
+    db.prepare("ALTER TABLE pos_sale_items ADD COLUMN IF NOT EXISTS commission_amount DOUBLE PRECISION"),
   ]);
+  await db.prepare("INSERT OR IGNORE INTO commission_settings (id,default_rate_percent,calculation_basis,updated_at) VALUES (1,5,'EXCLUDING_VAT',?)").bind(new Date().toISOString()).run();
 }
 
 export async function GET() {
@@ -51,12 +59,16 @@ export async function POST(request: Request) {
     const saleNumber = `POS-${Date.now().toString().slice(-9)}`;
     const insert = await env.DB.prepare("INSERT INTO pos_sales (sale_number, payment_method, account_number, subtotal, total, status, created_at) VALUES (?, ?, ?, ?, ?, 'PAID', ?)").bind(saleNumber, method, account?.accountNumber ?? null, total, total, createdAt).run();
     const saleId = Number(insert.meta.last_row_id);
-    const statements = lines.flatMap(line => [
-      env.DB.prepare("UPDATE products SET quantity=quantity-? WHERE id=? AND quantity>=?").bind(line.quantity, line.productId, line.quantity),
-      env.DB.prepare("INSERT INTO pos_sale_items (sale_id, product_id, product_name, quantity, unit, unit_price, line_total) VALUES (?, ?, ?, ?, ?, ?, ?)").bind(saleId, line.productId, line.name, line.quantity, line.unit, line.unitPrice, line.quantity * line.unitPrice),
-    ]);
-    if (method === "Cash") statements.push(env.DB.prepare("INSERT INTO till_movements (reference, movement_type, amount, payment_method, note, created_at) VALUES (?, 'SALE', ?, 'Cash', 'Cash sale', ?)").bind(saleNumber, total, createdAt));
-    await env.DB.batch(statements);
+    const commissionSettings=await env.DB.prepare("SELECT default_rate_percent AS defaultRatePercent FROM commission_settings WHERE id=1").first<{defaultRatePercent:number}>();
+    const vatSetting=await env.DB.prepare("SELECT value FROM business_settings WHERE key='vat_rate'").first<{value:string}>().catch(()=>null);const vatRate=Math.max(0,Number(vatSetting?.value??15));
+    for(const line of lines){
+      const staff=line.commissionStaffId?await env.DB.prepare("SELECT id,COALESCE(custom_rate_percent,?) AS ratePercent FROM commission_staff WHERE id=? AND active=1").bind(Number(commissionSettings?.defaultRatePercent??5),line.commissionStaffId).first<{id:number;ratePercent:number}>():null;
+      const gross=line.quantity*line.unitPrice;const net=gross/(1+vatRate/100);const rate=staff?Number(staff.ratePercent):0;const commission=net*rate/100;
+      await env.DB.prepare("UPDATE products SET quantity=quantity-? WHERE id=? AND quantity>=?").bind(line.quantity,line.productId,line.quantity).run();
+      const item=await env.DB.prepare("INSERT INTO pos_sale_items (sale_id,product_id,product_name,quantity,unit,unit_price,line_total,commission_staff_id,commission_rate_percent,commission_net_ex_vat,commission_amount) VALUES (?,?,?,?,?,?,?,?,?,?,?)").bind(saleId,line.productId,line.name,line.quantity,line.unit,line.unitPrice,gross,staff?.id??null,staff?rate:null,staff?net:null,staff?commission:null).run();
+      if(staff)await env.DB.prepare("INSERT INTO commission_entries (sale_id,sale_item_id,staff_id,product_id,product_name,quantity,gross_amount,net_ex_vat,rate_percent,commission_amount,entry_type,reference,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,'EARNED',?,?)").bind(saleId,item.meta.last_row_id,staff.id,line.productId,line.name,line.quantity,gross,net,rate,commission,saleNumber,createdAt).run();
+    }
+    if(method==="Cash")await env.DB.prepare("INSERT INTO till_movements (reference, movement_type, amount, payment_method, note, created_at) VALUES (?, 'SALE', ?, 'Cash', 'Cash sale', ?)").bind(saleNumber,total,createdAt).run();
     if (account) {
       const purchase = await env.DB.prepare("INSERT INTO customer_purchases (account_id, invoice_number, purchase_date, total, balance, status) VALUES (?, ?, ?, ?, ?, ?)").bind(account.id, saleNumber, date, total, accountCharge, accountCharge>0?'OPEN':'PAID').run();
       const purchaseId = Number(purchase.meta.last_row_id);
@@ -82,6 +94,7 @@ export async function POST(request: Request) {
     const lines = payload.lines ?? []; if (!lines.length) return Response.json({ error: "Choose products to return" }, { status: 400 });
     const reference = `RET-${Date.now().toString().slice(-8)}`; const total = lines.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0); const method = payload.paymentMethod ?? "Cash";
     await env.DB.batch([...lines.map(line => env.DB.prepare("UPDATE products SET quantity=quantity+? WHERE id=?").bind(line.quantity, line.productId)), env.DB.prepare("INSERT INTO till_movements (reference, movement_type, amount, payment_method, note, created_at) VALUES (?, 'RETURN', ?, ?, ?, ?)").bind(reference, total, method, payload.originalSaleNumber ?? "Customer return", createdAt)]);
+    if(payload.originalSaleNumber?.trim())for(const line of lines){const earned=await env.DB.prepare("SELECT c.sale_id AS saleId,c.sale_item_id AS saleItemId,c.staff_id AS staffId,c.product_id AS productId,c.product_name AS productName,c.quantity,c.gross_amount AS grossAmount,c.net_ex_vat AS netExVat,c.rate_percent AS ratePercent,c.commission_amount AS commissionAmount FROM commission_entries c JOIN pos_sales s ON s.id=c.sale_id WHERE s.sale_number=? AND c.product_id=? AND c.entry_type='EARNED' ORDER BY c.id LIMIT 1").bind(payload.originalSaleNumber.trim(),line.productId).first<{saleId:number;saleItemId:number;staffId:number;productId:number;productName:string;quantity:number;grossAmount:number;netExVat:number;ratePercent:number;commissionAmount:number}>();if(earned){const ratio=Math.min(1,line.quantity/Math.max(earned.quantity,.000001));await env.DB.prepare("INSERT INTO commission_entries (sale_id,sale_item_id,staff_id,product_id,product_name,quantity,gross_amount,net_ex_vat,rate_percent,commission_amount,entry_type,reference,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,'REVERSAL',?,?)").bind(earned.saleId,earned.saleItemId,earned.staffId,earned.productId,earned.productName,line.quantity,earned.grossAmount*ratio,earned.netExVat*ratio,earned.ratePercent,earned.commissionAmount*ratio,reference,createdAt).run();}}
     return Response.json({ ok: true, reference });
   }
   return Response.json({ error: "Unknown POS action" }, { status: 400 });

@@ -87,10 +87,36 @@ test("sandbox copies live manager and back office data without write requests", 
   assert.match(page, /\["Sand-box", "Sandbox"\]/);
   assert.match(page, /portal === "Sandbox" \? <SandboxWorkspace/);
   assert.match(sandbox, /Promise\.all\(\[/);
-  for (const endpoint of ["control", "finance", "orders", "payroll", "receiving", "scales"]) assert.match(sandbox, new RegExp(`/api/${endpoint}`));
+  for (const endpoint of ["control", "finance", "orders", "payroll", "receiving", "scales", "commission"]) assert.match(sandbox, new RegExp(`/api/${endpoint}`));
   assert.match(sandbox, /method:"GET"/);
   assert.doesNotMatch(sandbox, /method:\s*["'](?:POST|PUT|PATCH|DELETE)["']/);
   assert.match(sandbox, /nothing can be written back/i);
   assert.match(sandbox, /Reset scenario/);
   assert.match(styles, /\.sandbox-lock/);
+});
+
+test("staff commission is editable, VAT-exclusive and attributed through scale PLUs", async () => {
+  const [page, commission, pos, scales, migration, sandbox] = await Promise.all([
+    projectFile("app/page.tsx"),
+    projectFile("app/api/commission/route.ts"),
+    projectFile("app/api/pos/route.ts"),
+    projectFile("app/api/scales/route.ts"),
+    projectFile("drizzle/0013_staff_commission.sql"),
+    projectFile("app/components/SandboxWorkspace.tsx"),
+  ]);
+
+  assert.match(page, /OWNER BACK OFFICE \/ COMMISSION/);
+  assert.match(page, /Save commission rate/);
+  assert.match(page, /% of VAT-exclusive paid sales/);
+  assert.match(commission, /default_rate_percent REAL NOT NULL DEFAULT 5/);
+  assert.match(commission, /calculation_basis='EXCLUDING_VAT'/);
+  assert.match(commission, /custom_rate_percent/);
+  assert.match(pos, /gross\/\(1\+vatRate\/100\)/);
+  assert.match(pos, /entry_type,reference,created_at/);
+  assert.match(pos, /'REVERSAL'/);
+  assert.match(scales, /function expandedItems/);
+  assert.match(scales, /const aliasPlu=/);
+  assert.match(scales, /commissionStaffId/);
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS commission_entries/);
+  assert.match(sandbox, /function SandboxCommission/);
 });
