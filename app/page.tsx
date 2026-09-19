@@ -60,12 +60,27 @@ const money = (value: number) => value.toLocaleString("en-ZA", { style: "currenc
 export default function Home() {
   const [portal, setPortal] = useState("Manager");
   const [section, setSection] = useState("Manager overview");
+  const [theme, setTheme] = useState<"light" | "dark">("light");
   const [supplier, setSupplier] = useState("Karoo Prime Meats");
   const [profile, setProfile] = useState("Beef hind quarter");
   const [weight, setWeight] = useState(100);
   const [invoice, setInvoice] = useState("KPM-68142");
   const [batches, setBatches] = useState(seedBatches);
   const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem("butchery-os-theme");
+    const initial = saved === "dark" ? "dark" : "light";
+    document.documentElement.classList.toggle("dark-theme", initial === "dark");
+    setTheme(initial);
+  }, []);
+
+  function toggleTheme() {
+    const next = theme === "light" ? "dark" : "light";
+    document.documentElement.classList.toggle("dark-theme", next === "dark");
+    window.localStorage.setItem("butchery-os-theme", next);
+    setTheme(next);
+  }
 
   const estimates = useMemo(() => PROFILES[profile].map((item) => {
     const expected = weight * item.percent / 100;
@@ -106,6 +121,7 @@ export default function Home() {
           <div className="topbar-brand"><strong>GEORGE&apos;S BUTCHERY</strong><span><i className="live-dot" /> LEDGER ONLINE</span></div>
           <div className="portal-switch" aria-label="Choose work area">{[["Manager", "Manager"], ["Cashier", "Cashier"], ["Butcher", "Butcher"], ["Back office", "Owner"], ["Sand-box", "Sandbox"]].map(([label, target]) => <button key={target} className={portal === target ? "active" : ""} onClick={() => { setPortal(target); setSection(target === "Manager" ? "Manager overview" : target === "Cashier" ? "POS" : target === "Butcher" ? "Orders" : target === "Sandbox" ? "Sandbox overview" : "Owner overview"); }}>{label}</button>)}</div>
           <div className="shift">WED 12 AUG · MORNING SHIFT</div>
+          <button className="theme-toggle" type="button" role="switch" aria-checked={theme === "dark"} aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`} onClick={toggleTheme}><span aria-hidden="true">{theme === "light" ? "☼" : "☾"}</span><b>{theme === "light" ? "LIGHT" : "DARK"}</b><i aria-hidden="true" /></button>
         </header>
 
         {portal === "Sandbox" ? <SandboxWorkspace section={section} /> : section === "Manager overview" ? <OperationsOverview batches={batches} onNavigate={setSection} /> : section === "Receiving" ? <UniversalReceiving /> : section === "Owner overview" ? <OwnerOverview onNavigate={setSection} onOpenPortal={(target) => { setPortal(target); setSection(target === "Manager" ? "Manager overview" : target === "Cashier" ? "POS" : "Orders"); }} /> : section === "Pricing" ? <PricingEngine /> : section === "Scale network" ? <ScaleNetwork /> : section === "Batch tracking" ? <BatchTracking batches={batches} /> : section === "Cooler inventory" ? <CoolerInventory estimates={estimates} /> : section === "Orders" ? <ButcherOrders /> : section === "Stock master" ? <StockMaster /> : section === "Stock count" ? <StockCount /> : section === "Waste & loss" ? <WasteLoss /> : section === "Payroll" ? <Payroll /> : section === "Commission" ? <CommissionControl /> : section === "Reports" ? <ManagementReports /> : section === "Settings" ? <BusinessSettings /> : section === "POS" ? <StandardPOS /> : section === "Accounts & Calendar" ? <FinancialControl initialTab="Accounts overview" /> : <div className="content">
