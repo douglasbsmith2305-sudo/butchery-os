@@ -57,6 +57,9 @@ test("back office controls target margins and price decrease approvals", async (
   assert.match(page, /forecastFactor/);
   assert.match(page, /p\.sellingPrice\*uplift,marginFloor\*targetChangeFactor/);
   assert.match(page, /PROPOSED \/ UNIT/);
+  assert.match(page, /CURRENT NET MARGIN/);
+  assert.match(page, /currentNetMargin/);
+  assert.match(page, /accruedExpenses/);
   assert.match(page, /setDrafts\(\{\}\)/);
   assert.match(page, /\(bone\|bones\).*been\|bene/);
   assert.match(control, /\(bone\|bones\).*been\|bene/);
