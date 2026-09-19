@@ -76,3 +76,21 @@ test("four bulk meat inputs run automatic block tests while other stock remains 
   assert.match(route, /outputQuantity\*1\.02/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS block_test_allocations/);
 });
+
+test("sandbox copies live manager and back office data without write requests", async () => {
+  const [page, sandbox, styles] = await Promise.all([
+    projectFile("app/page.tsx"),
+    projectFile("app/components/SandboxWorkspace.tsx"),
+    projectFile("app/globals.css"),
+  ]);
+
+  assert.match(page, /\["Sand-box", "Sandbox"\]/);
+  assert.match(page, /portal === "Sandbox" \? <SandboxWorkspace/);
+  assert.match(sandbox, /Promise\.all\(\[/);
+  for (const endpoint of ["control", "finance", "orders", "payroll", "receiving", "scales"]) assert.match(sandbox, new RegExp(`/api/${endpoint}`));
+  assert.match(sandbox, /method:"GET"/);
+  assert.doesNotMatch(sandbox, /method:\s*["'](?:POST|PUT|PATCH|DELETE)["']/);
+  assert.match(sandbox, /nothing can be written back/i);
+  assert.match(sandbox, /Reset scenario/);
+  assert.match(styles, /\.sandbox-lock/);
+});

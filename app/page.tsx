@@ -2,6 +2,7 @@
 
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { BLOCK_TEST_PROFILES, blockTestProfile } from "@/lib/block-tests";
+import SandboxWorkspace from "@/app/components/SandboxWorkspace";
 
 type Yield = { name: string; percent: number; price: number };
 type Batch = { id: string; supplier: string; type: string; weight: number; date: string };
@@ -93,8 +94,8 @@ export default function Home() {
           <div className="brand-label"><strong>OPERATING SYSTEM</strong><small>TRACE EVERY KILOGRAM</small></div>
         </div>
         <nav aria-label="Main navigation">
-          <p>{portal === "Manager" ? "BUTCHERY MANAGER" : portal === "Cashier" ? "CASHIER" : portal === "Butcher" ? "BUTCHER COUNTER" : "OWNER BACK OFFICE"}</p>
-          {(portal === "Manager" ? ["Manager overview", "Receiving", "Stock master", "Cooler inventory", "Orders", "Stock count", "Waste & loss"] : portal === "Cashier" ? ["POS"] : portal === "Butcher" ? ["Orders"] : ["Owner overview", "Pricing", "Scale network", "Batch tracking", "Accounts & Calendar", "Payroll", "Reports", "Settings"]).map((name, i) => <button key={name} className={section === name ? "active" : ""} onClick={() => setSection(name)}><span>{String(i + 1).padStart(2, "0")}</span>{name}</button>)}
+          <p>{portal === "Manager" ? "BUTCHERY MANAGER" : portal === "Cashier" ? "CASHIER" : portal === "Butcher" ? "BUTCHER COUNTER" : portal === "Sandbox" ? "SANDBOX · NO LIVE WRITES" : "OWNER BACK OFFICE"}</p>
+          {(portal === "Manager" ? ["Manager overview", "Receiving", "Stock master", "Cooler inventory", "Orders", "Stock count", "Waste & loss"] : portal === "Cashier" ? ["POS"] : portal === "Butcher" ? ["Orders"] : portal === "Sandbox" ? ["Sandbox overview", "Receiving", "Stock master", "Cooler inventory", "Orders", "Stock count", "Waste & loss", "Owner overview", "Pricing", "Scale network", "Batch tracking", "Accounts & Calendar", "Payroll", "Reports", "Settings"] : ["Owner overview", "Pricing", "Scale network", "Batch tracking", "Accounts & Calendar", "Payroll", "Reports", "Settings"]).map((name, i) => <button key={name} className={section === name ? "active" : ""} onClick={() => setSection(name)}><span>{String(i + 1).padStart(2, "0")}</span>{name}</button>)}
         </nav>
         <div className="operator"><span>NM</span><div><strong>Naledi Mokoena</strong><small>Warehouse operator</small></div></div>
       </aside>
@@ -103,11 +104,11 @@ export default function Home() {
         <header className="topbar">
           <button className="mobile-menu" aria-label="Open menu">☰</button>
           <div className="topbar-brand"><strong>GEORGE&apos;S BUTCHERY</strong><span><i className="live-dot" /> LEDGER ONLINE</span></div>
-          <div className="portal-switch" aria-label="Choose work area">{[["Manager", "Manager"], ["Cashier", "Cashier"], ["Butcher", "Butcher"], ["Back office", "Owner"]].map(([label, target]) => <button key={target} className={portal === target ? "active" : ""} onClick={() => { setPortal(target); setSection(target === "Manager" ? "Manager overview" : target === "Cashier" ? "POS" : target === "Butcher" ? "Orders" : "Owner overview"); }}>{label}</button>)}</div>
+          <div className="portal-switch" aria-label="Choose work area">{[["Manager", "Manager"], ["Cashier", "Cashier"], ["Butcher", "Butcher"], ["Back office", "Owner"], ["Sand-box", "Sandbox"]].map(([label, target]) => <button key={target} className={portal === target ? "active" : ""} onClick={() => { setPortal(target); setSection(target === "Manager" ? "Manager overview" : target === "Cashier" ? "POS" : target === "Butcher" ? "Orders" : target === "Sandbox" ? "Sandbox overview" : "Owner overview"); }}>{label}</button>)}</div>
           <div className="shift">WED 12 AUG · MORNING SHIFT</div>
         </header>
 
-        {section === "Manager overview" ? <OperationsOverview batches={batches} onNavigate={setSection} /> : section === "Receiving" ? <UniversalReceiving /> : section === "Owner overview" ? <OwnerOverview onNavigate={setSection} onOpenPortal={(target) => { setPortal(target); setSection(target === "Manager" ? "Manager overview" : target === "Cashier" ? "POS" : "Orders"); }} /> : section === "Pricing" ? <PricingEngine /> : section === "Scale network" ? <ScaleNetwork /> : section === "Batch tracking" ? <BatchTracking batches={batches} /> : section === "Cooler inventory" ? <CoolerInventory estimates={estimates} /> : section === "Orders" ? <ButcherOrders /> : section === "Stock master" ? <StockMaster /> : section === "Stock count" ? <StockCount /> : section === "Waste & loss" ? <WasteLoss /> : section === "Payroll" ? <Payroll /> : section === "Reports" ? <ManagementReports /> : section === "Settings" ? <BusinessSettings /> : section === "POS" ? <StandardPOS /> : section === "Accounts & Calendar" ? <FinancialControl initialTab="Accounts overview" /> : <div className="content">
+        {portal === "Sandbox" ? <SandboxWorkspace section={section} /> : section === "Manager overview" ? <OperationsOverview batches={batches} onNavigate={setSection} /> : section === "Receiving" ? <UniversalReceiving /> : section === "Owner overview" ? <OwnerOverview onNavigate={setSection} onOpenPortal={(target) => { setPortal(target); setSection(target === "Manager" ? "Manager overview" : target === "Cashier" ? "POS" : "Orders"); }} /> : section === "Pricing" ? <PricingEngine /> : section === "Scale network" ? <ScaleNetwork /> : section === "Batch tracking" ? <BatchTracking batches={batches} /> : section === "Cooler inventory" ? <CoolerInventory estimates={estimates} /> : section === "Orders" ? <ButcherOrders /> : section === "Stock master" ? <StockMaster /> : section === "Stock count" ? <StockCount /> : section === "Waste & loss" ? <WasteLoss /> : section === "Payroll" ? <Payroll /> : section === "Reports" ? <ManagementReports /> : section === "Settings" ? <BusinessSettings /> : section === "POS" ? <StandardPOS /> : section === "Accounts & Calendar" ? <FinancialControl initialTab="Accounts overview" /> : <div className="content">
           <div className="eyebrow">COOLER / RECEIVING</div>
           <div className="page-heading">
             <div><h1>Receive meat. Know what you have.</h1><p>One scale weight creates estimated cut inventory automatically. No manual block test required.</p></div>
