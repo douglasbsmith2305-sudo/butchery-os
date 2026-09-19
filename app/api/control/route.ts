@@ -53,7 +53,7 @@ export async function GET() {
   const wasteRows = wastes.results as Array<{ quantity: number; value: number }>;
   const invoiceRows = supplierInvoices.results as Array<{ balance: number; status: string }>;
   const performance = productSales.results as Array<{ id:number;name:string;department:string;unit:string;costPrice:number;sellingPrice:number;targetMarginPercent:number;stockQuantity:number;soldQuantity:number;revenue:number }>;
-  const byproducts = performance.filter(p => /bone|bones|fat|waste|vet|been/i.test(p.name));
+  const byproducts = performance.filter(p => /bone|bones|fat|waste|vet|been|bene/i.test(p.name));
   const byproductCostDrag = byproducts.reduce((sum,p)=>sum+Math.max(0,p.costPrice-p.sellingPrice)*p.stockQuantity,0);
   const saleableStockKg = performance.filter(p=>!byproducts.some(b=>b.id===p.id)&&p.unit.toLowerCase()==="kg").reduce((sum,p)=>sum+p.stockQuantity,0);
   const settingMap=Object.fromEntries((settings.results as Array<{ key: string; value: string }>).map(item => [item.key, item.value]));

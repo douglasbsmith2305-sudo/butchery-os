@@ -52,6 +52,11 @@ test("back office controls target margins and price decrease approvals", async (
   assert.match(page, /Price decreases awaiting approval/);
   assert.match(page, /Approve decrease/);
   assert.match(page, /TARGET MARGIN/);
+  assert.match(page, /targetChangeFactor/);
+  assert.match(page, /marginFloor/);
+  assert.match(page, /setDrafts\(\{\}\)/);
+  assert.match(page, /been\|bene/);
+  assert.match(control, /been\|bene/);
   assert.match(control, /price_decrease_decision/);
   assert.match(control, /APPROVED_PRICE_DECREASE/);
   assert.match(control, /target_margin_percent/);
