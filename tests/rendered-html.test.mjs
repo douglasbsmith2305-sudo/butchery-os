@@ -138,3 +138,21 @@ test("manager can access the shared accounts and calendar workspace", async () =
   assert.match(page, /portal === "Manager" \? \["Manager overview", "Receiving", "Stock master", "Cooler inventory", "Orders", "Stock count", "Waste & loss", "Accounts & Calendar"\]/);
   assert.match(page, /section === "Accounts & Calendar" \? <FinancialControl initialTab="Accounts overview" \/>/);
 });
+
+test("owner overview holds pricing decisions and performance while reports show real carcass cost", async () => {
+  const page = await projectFile("app/page.tsx");
+
+  const overview = page.slice(page.indexOf("function OwnerOverview"), page.indexOf("function StockCount"));
+  const pricing = page.slice(page.indexOf("function PricingEngine"), page.indexOf("function ScaleNetwork"));
+  const reports = page.slice(page.indexOf("function ManagementReports"), page.indexOf("function BusinessSettings"));
+
+  assert.match(overview, /Price decreases awaiting approval/);
+  assert.match(overview, /Approve decrease ✓/);
+  assert.match(overview, /TOP SELLERS · THIS MONTH/);
+  assert.match(overview, /UNDER-PERFORMING · THIS MONTH/);
+  assert.doesNotMatch(pricing, /Price decreases awaiting approval/);
+  assert.doesNotMatch(pricing, /THE REAL CARCASS COST/);
+  assert.match(reports, /"Real carcass cost"/);
+  assert.match(reports, /BONE \/ FAT COST DRAG/);
+  assert.match(reports, /RECOVERY REQUIRED/);
+});
