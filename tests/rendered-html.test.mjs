@@ -140,7 +140,10 @@ test("manager can access the shared accounts and calendar workspace", async () =
 });
 
 test("owner overview holds pricing decisions and performance while reports show real carcass cost", async () => {
-  const page = await projectFile("app/page.tsx");
+  const [page, theme] = await Promise.all([
+    projectFile("app/page.tsx"),
+    projectFile("app/theme.css"),
+  ]);
 
   const overview = page.slice(page.indexOf("function OwnerOverview"), page.indexOf("function StockCount"));
   const pricing = page.slice(page.indexOf("function PricingEngine"), page.indexOf("function ScaleNetwork"));
@@ -155,4 +158,5 @@ test("owner overview holds pricing decisions and performance while reports show 
   assert.match(reports, /"Real carcass cost"/);
   assert.match(reports, /BONE \/ FAT COST DRAG/);
   assert.match(reports, /RECOVERY REQUIRED/);
+  assert.match(theme, /html\.dark-theme \.performance-split>\.panel\{[^}]+!important/);
 });
