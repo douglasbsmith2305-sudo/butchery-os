@@ -120,3 +120,10 @@ test("staff commission is editable, VAT-exclusive and attributed through scale P
   assert.match(migration, /CREATE TABLE IF NOT EXISTS commission_entries/);
   assert.match(sandbox, /function SandboxCommission/);
 });
+
+test("manager can access the shared accounts and calendar workspace", async () => {
+  const page = await projectFile("app/page.tsx");
+
+  assert.match(page, /portal === "Manager" \? \["Manager overview", "Receiving", "Stock master", "Cooler inventory", "Orders", "Stock count", "Waste & loss", "Accounts & Calendar"\]/);
+  assert.match(page, /section === "Accounts & Calendar" \? <FinancialControl initialTab="Accounts overview" \/>/);
+});
