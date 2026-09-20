@@ -160,3 +160,30 @@ test("owner overview holds pricing decisions and performance while reports show 
   assert.match(reports, /RECOVERY REQUIRED/);
   assert.match(theme, /html\.dark-theme \.performance-split>\.panel\{[^}]+!important/);
 });
+
+test("POS supports discounts, daily cash-up and department-routed orders", async () => {
+  const [page, pos, orders, migration, styles] = await Promise.all([
+    projectFile("app/page.tsx"),
+    projectFile("app/api/pos/route.ts"),
+    projectFile("app/api/orders/route.ts"),
+    projectFile("drizzle/0014_pos_cashup_discount_order_routing.sql"),
+    projectFile("app/globals.css"),
+  ]);
+
+  assert.match(page, /className="discount-block"/);
+  assert.match(page, /discountAmount/);
+  assert.match(page, /END-OF-DAY CASH-UP/);
+  assert.match(page, /Close daily sales & cash up/);
+  for (const label of ["Send to Butcher", "Send to Takeaways", "Send to Bakery"]) assert.match(page, new RegExp(label));
+  assert.match(page, /queueDestination/);
+  assert.match(pos, /payload\.action==="CASH_UP"/);
+  assert.match(pos, /payload\.action==="OPEN_TILL"/);
+  assert.match(pos, /discount_amount/);
+  assert.match(pos, /expectedCash/);
+  assert.match(orders, /destination/);
+  assert.match(orders, /\["BUTCHER","TAKEAWAYS","BAKERY"\]/);
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS till_sessions/);
+  assert.match(migration, /ALTER TABLE butcher_orders ADD COLUMN IF NOT EXISTS destination/);
+  assert.match(styles, /\.cashup-form/);
+  assert.match(styles, /\.destination-tabs/);
+});
