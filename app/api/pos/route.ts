@@ -15,6 +15,7 @@ async function ensureSchema() {
     db.prepare("CREATE TABLE IF NOT EXISTS customer_purchase_items (id INTEGER PRIMARY KEY AUTOINCREMENT, purchase_id INTEGER NOT NULL, product_name TEXT NOT NULL, quantity REAL NOT NULL, unit TEXT NOT NULL, unit_price REAL NOT NULL, line_total REAL NOT NULL, FOREIGN KEY(purchase_id) REFERENCES customer_purchases(id))"),
     db.prepare("CREATE TABLE IF NOT EXISTS pos_sales (id INTEGER PRIMARY KEY AUTOINCREMENT, sale_number TEXT NOT NULL UNIQUE, payment_method TEXT NOT NULL, account_number TEXT, subtotal REAL NOT NULL, total REAL NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL)"),
     db.prepare("ALTER TABLE pos_sales ADD COLUMN IF NOT EXISTS discount_amount DOUBLE PRECISION NOT NULL DEFAULT 0"),
+    db.prepare("ALTER TABLE pos_sales ADD COLUMN IF NOT EXISTS discount_percent DOUBLE PRECISION NOT NULL DEFAULT 0"),
     db.prepare("ALTER TABLE pos_sales ADD COLUMN IF NOT EXISTS till_session_id INTEGER"),
     db.prepare("CREATE TABLE IF NOT EXISTS pos_sale_items (id INTEGER PRIMARY KEY AUTOINCREMENT, sale_id INTEGER NOT NULL, product_id INTEGER NOT NULL, product_name TEXT NOT NULL, quantity REAL NOT NULL, unit TEXT NOT NULL, unit_price REAL NOT NULL, line_total REAL NOT NULL, FOREIGN KEY(sale_id) REFERENCES pos_sales(id))"),
     db.prepare("CREATE TABLE IF NOT EXISTS till_movements (id INTEGER PRIMARY KEY AUTOINCREMENT, reference TEXT NOT NULL, movement_type TEXT NOT NULL, amount REAL NOT NULL, payment_method TEXT NOT NULL, note TEXT, created_at TEXT NOT NULL)"),
@@ -54,7 +55,7 @@ export async function GET() {
   const [products, accounts, sales, movements, sessions] = await Promise.all([
     env.DB.prepare("SELECT id, sku, barcode, name, department, unit, cost_price AS costPrice, selling_price AS sellingPrice, quantity FROM products WHERE quantity > 0 ORDER BY name LIMIT 1000").all(),
     env.DB.prepare("SELECT id, account_number AS accountNumber, name, credit_limit AS creditLimit, balance, voucher_balance AS voucherBalance, status FROM customer_accounts WHERE status='ACTIVE' ORDER BY account_number").all(),
-    env.DB.prepare("SELECT id, sale_number AS saleNumber, payment_method AS paymentMethod, account_number AS accountNumber, subtotal,discount_amount AS discountAmount,total,status,created_at AS createdAt FROM pos_sales ORDER BY id DESC LIMIT 20").all(),
+    env.DB.prepare("SELECT id, sale_number AS saleNumber, payment_method AS paymentMethod, account_number AS accountNumber, subtotal,discount_percent AS discountPercent,discount_amount AS discountAmount,total,status,created_at AS createdAt FROM pos_sales ORDER BY id DESC LIMIT 20").all(),
     session?env.DB.prepare("SELECT id,reference,movement_type AS movementType,amount,payment_method AS paymentMethod,note,created_at AS createdAt FROM till_movements WHERE till_session_id=? ORDER BY id DESC LIMIT 100").bind(session.id).all():Promise.resolve({results:[]}),
     env.DB.prepare("SELECT id,session_number AS sessionNumber,business_date AS businessDate,opening_float AS openingFloat,status,opened_at AS openedAt,closed_at AS closedAt,expected_cash AS expectedCash,counted_cash AS countedCash,variance,cash_sales AS cashSales,card_sales AS cardSales,eft_sales AS eftSales,account_sales AS accountSales,account_payments AS accountPayments,cash_payouts AS cashPayouts,cash_returns AS cashReturns,notes FROM till_sessions ORDER BY id DESC LIMIT 20").all(),
   ]);
@@ -64,7 +65,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   await ensureSchema();
-  const payload = await request.json() as { action?: string; lines?: Line[]; paymentMethod?: string; accountNumber?: string; amount?: number; discountAmount?:number; note?: string; originalSaleNumber?: string };
+  const payload = await request.json() as { action?: string; lines?: Line[]; paymentMethod?: string; accountNumber?: string; amount?: number; discountPercent?:number; note?: string; originalSaleNumber?: string };
   const now = new Date(); const createdAt = now.toISOString(); const date = createdAt.slice(0, 10);
   if(payload.action==="OPEN_TILL"){
     if(await activeTill())return Response.json({error:"A till session is already open"},{status:409}); const openingFloat=Math.max(0,Number(payload.amount)||0); const session=await createTill(openingFloat); return Response.json({ok:true,reference:session?.sessionNumber,session});
@@ -88,11 +89,11 @@ export async function POST(request: Request) {
       const product = await env.DB.prepare("SELECT quantity FROM products WHERE id=?").bind(line.productId).first<{ quantity: number }>();
       if (!product || product.quantity < line.quantity) return Response.json({ error: `Not enough stock for ${line.name}` }, { status: 409 });
     }
-    const subtotal = lines.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0); const discountAmount=Math.min(subtotal,Math.max(0,Number(payload.discountAmount)||0)); const total=subtotal-discountAmount; const discountFactor=subtotal>0?total/subtotal:1;
+    const subtotal = lines.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0); const discountPercent=Math.min(100,Math.max(0,Number(payload.discountPercent)||0)); const discountAmount=Math.round(subtotal*discountPercent)/100; const total=subtotal-discountAmount; const discountFactor=subtotal>0?total/subtotal:1;
     const voucherUsed=account?Math.min(total,Math.max(0,account.voucherBalance)):0; const accountCharge=total-voucherUsed;
     if (account && account.balance + accountCharge > account.creditLimit) return Response.json({ error: "This sale exceeds the account credit limit" }, { status: 409 });
     const saleNumber = `POS-${Date.now().toString().slice(-9)}`;
-    const insert = await env.DB.prepare("INSERT INTO pos_sales (sale_number,payment_method,account_number,subtotal,discount_amount,total,status,till_session_id,created_at) VALUES (?,?,?,?,?,?,'PAID',?,?)").bind(saleNumber,method,account?.accountNumber??null,subtotal,discountAmount,total,session.id,createdAt).run();
+    const insert = await env.DB.prepare("INSERT INTO pos_sales (sale_number,payment_method,account_number,subtotal,discount_percent,discount_amount,total,status,till_session_id,created_at) VALUES (?,?,?,?,?,?,?,'PAID',?,?)").bind(saleNumber,method,account?.accountNumber??null,subtotal,discountPercent,discountAmount,total,session.id,createdAt).run();
     const saleId = Number(insert.meta.last_row_id);
     const commissionSettings=await env.DB.prepare("SELECT default_rate_percent AS defaultRatePercent FROM commission_settings WHERE id=1").first<{defaultRatePercent:number}>();
     const vatSetting=await env.DB.prepare("SELECT value FROM business_settings WHERE key='vat_rate'").first<{value:string}>().catch(()=>null);const vatRate=Math.max(0,Number(vatSetting?.value??15));

@@ -171,7 +171,8 @@ test("POS supports discounts, daily cash-up and department-routed orders", async
   ]);
 
   assert.match(page, /className="discount-block"/);
-  assert.match(page, /discountAmount/);
+  assert.match(page, /discountPercent/);
+  assert.match(page, /max="100"/);
   assert.match(page, /END-OF-DAY CASH-UP/);
   assert.match(page, /Close daily sales & cash up/);
   for (const label of ["Send to Butcher", "Send to Takeaways", "Send to Bakery"]) assert.match(page, new RegExp(label));
