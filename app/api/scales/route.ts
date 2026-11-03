@@ -29,11 +29,11 @@ async function ensureMappings(deviceId:number) {
     INSERT INTO scale_product_mappings (device_id,product_id,plu,barcode_prefix,label_name,enabled,updated_at)
     SELECT ?,p.id,CAST(1000+p.id AS TEXT),'20',SUBSTR(p.name,1,30),1,?
     FROM products p
-    WHERE p.active=1 AND LOWER(p.unit)='kg'
+    WHERE p.active=1 AND p.department<>'Cost of goods' AND LOWER(p.unit)='kg'
       AND NOT EXISTS (SELECT 1 FROM scale_product_mappings current WHERE current.device_id=? AND current.product_id=p.id)
       AND NOT EXISTS (SELECT 1 FROM scale_product_mappings occupied WHERE occupied.device_id=? AND occupied.plu=CAST(1000+p.id AS TEXT))
   `).bind(deviceId,now,deviceId,deviceId).run();
-  const products=await env.DB.prepare("SELECT COUNT(*) AS count FROM products WHERE active=1 AND LOWER(unit)='kg'").first<{count:number}>();
+  const products=await env.DB.prepare("SELECT COUNT(*) AS count FROM products WHERE active=1 AND department<>'Cost of goods' AND LOWER(unit)='kg'").first<{count:number}>();
   const staff=await env.DB.prepare("SELECT COUNT(*) AS count FROM commission_staff WHERE active=1").first<{count:number}>();
   return Number(products?.count??0)*(Number(staff?.count??0)+1);
 }
@@ -47,12 +47,12 @@ function expandedItems(mappings:Record<string,unknown>[],staff:CommissionStaff[]
 export async function GET(request:Request) {
   await ensureSchema(); const url=new URL(request.url); const deviceId=Number(url.searchParams.get("device")); const format=url.searchParams.get("format");
   const scanned=url.searchParams.get("barcode")?.replace(/\D/g,"");
-  if(scanned){const [rows,staffRows]=await Promise.all([env.DB.prepare(`${productSelect} WHERE p.active=1 AND m.enabled=1`).all<Record<string,unknown>>(),env.DB.prepare("SELECT c.id,c.staff_code AS staffCode,e.full_name AS fullName,e.employee_number AS employeeNumber FROM commission_staff c JOIN payroll_employees e ON e.id=c.employee_id WHERE c.active=1 ORDER BY CAST(c.staff_code AS INTEGER)").all<CommissionStaff>()]);for(const item of expandedItems(rows.results,staffRows.results)){const decoded=decodeWeightedBarcode(scanned,{barcodePrefix:String(item.barcodePrefix),plu:String(item.plu),barcodeMode:String(item.barcodeMode),sellingPrice:Number(item.sellingPrice)});if(decoded){const stock=await env.DB.prepare("SELECT quantity FROM products WHERE id=? AND active=1").bind(item.productId).first<{quantity:number}>();return Response.json({ok:true,product:{id:item.productId,name:item.name,unit:item.unit,sellingPrice:item.sellingPrice,quantityAvailable:Number(stock?.quantity??0)},staff:item.commissionStaffId?{id:item.commissionStaffId,staffCode:item.staffCode,fullName:item.staffName}:null,...decoded,barcode:scanned});}}return Response.json({error:"Weighted scale barcode not recognised"},{status:404});}
+  if(scanned){const [rows,staffRows]=await Promise.all([env.DB.prepare(`${productSelect} WHERE p.active=1 AND p.department<>'Cost of goods' AND m.enabled=1`).all<Record<string,unknown>>(),env.DB.prepare("SELECT c.id,c.staff_code AS staffCode,e.full_name AS fullName,e.employee_number AS employeeNumber FROM commission_staff c JOIN payroll_employees e ON e.id=c.employee_id WHERE c.active=1 ORDER BY CAST(c.staff_code AS INTEGER)").all<CommissionStaff>()]);for(const item of expandedItems(rows.results,staffRows.results)){const decoded=decodeWeightedBarcode(scanned,{barcodePrefix:String(item.barcodePrefix),plu:String(item.plu),barcodeMode:String(item.barcodeMode),sellingPrice:Number(item.sellingPrice)});if(decoded){const stock=await env.DB.prepare("SELECT quantity FROM products WHERE id=? AND active=1").bind(item.productId).first<{quantity:number}>();return Response.json({ok:true,product:{id:item.productId,name:item.name,unit:item.unit,sellingPrice:item.sellingPrice,quantityAvailable:Number(stock?.quantity??0)},staff:item.commissionStaffId?{id:item.commissionStaffId,staffCode:item.staffCode,fullName:item.staffName}:null,...decoded,barcode:scanned});}}return Response.json({error:"Weighted scale barcode not recognised"},{status:404});}
   if(deviceId)await ensureMappings(deviceId);
   if(deviceId&&(format==="csv"||format==="json")){
     const device=await env.DB.prepare("SELECT id,name,brand,connector_type AS connectorType,location,endpoint,database_table AS databaseTable,last_sync_at AS lastSyncAt,last_sync_status AS lastSyncStatus FROM scale_devices WHERE id=? AND active=1").bind(deviceId).first<Record<string,unknown>>();
     if(!device)return Response.json({error:"Scale not found"},{status:404});
-    const [mappings,staffRows]=await Promise.all([env.DB.prepare(`${productSelect} WHERE p.active=1 AND m.device_id=? AND m.enabled=1 ORDER BY m.plu,p.name`).bind(deviceId).all<Record<string,unknown>>(),env.DB.prepare("SELECT c.id,c.staff_code AS staffCode,e.full_name AS fullName,e.employee_number AS employeeNumber FROM commission_staff c JOIN payroll_employees e ON e.id=c.employee_id WHERE c.active=1 ORDER BY CAST(c.staff_code AS INTEGER)").all<CommissionStaff>()]);
+    const [mappings,staffRows]=await Promise.all([env.DB.prepare(`${productSelect} WHERE p.active=1 AND p.department<>'Cost of goods' AND m.device_id=? AND m.enabled=1 ORDER BY m.plu,p.name`).bind(deviceId).all<Record<string,unknown>>(),env.DB.prepare("SELECT c.id,c.staff_code AS staffCode,e.full_name AS fullName,e.employee_number AS employeeNumber FROM commission_staff c JOIN payroll_employees e ON e.id=c.employee_id WHERE c.active=1 ORDER BY CAST(c.staff_code AS INTEGER)").all<CommissionStaff>()]);
     const scaleItems=expandedItems(mappings.results,staffRows.results);
     if(format==="csv"){
       const headers=["PLU","SKU","BarcodePrefix","LabelName","Department","Unit","PricePerKg","StaffCode","StaffName"];
@@ -67,7 +67,7 @@ export async function GET(request:Request) {
   for(const device of activeDevices.results)await ensureMappings(device.id);
   const [devices,mappings,jobs]=await Promise.all([
     env.DB.prepare("SELECT id,name,brand,connector_type AS connectorType,location,endpoint,database_table AS databaseTable,scale_group AS scaleGroup,active,last_sync_at AS lastSyncAt,last_sync_status AS lastSyncStatus,last_heartbeat_at AS lastHeartbeatAt,created_at AS createdAt FROM scale_devices ORDER BY name").all(),
-    env.DB.prepare(`${productSelect} WHERE p.active=1 ORDER BY m.device_id,m.plu,p.name`).all(),
+    env.DB.prepare(`${productSelect} WHERE p.active=1 AND p.department<>'Cost of goods' ORDER BY m.device_id,m.plu,p.name`).all(),
     env.DB.prepare("SELECT j.id,j.device_id AS deviceId,d.name AS deviceName,j.status,j.source,j.item_count AS itemCount,j.created_at AS createdAt,j.completed_at AS completedAt,j.error FROM scale_sync_jobs j JOIN scale_devices d ON d.id=j.device_id ORDER BY j.id DESC LIMIT 100").all(),
   ]);
   return Response.json({devices:devices.results,mappings:mappings.results,jobs:jobs.results});

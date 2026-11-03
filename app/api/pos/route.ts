@@ -54,7 +54,7 @@ export async function GET() {
   await ensureSchema();
   let session=await activeTill(); const sessionCount=await env.DB.prepare("SELECT COUNT(*) AS count FROM till_sessions").first<{count:number}>(); if(!session&&Number(sessionCount?.count??0)===0)session=await createTill(0);
   const [products, accounts, sales, movements, sessions] = await Promise.all([
-    env.DB.prepare("SELECT id, sku, barcode, name, department, unit, cost_price AS costPrice, selling_price AS sellingPrice, quantity FROM products WHERE active=1 AND quantity > 0 ORDER BY name LIMIT 1000").all(),
+    env.DB.prepare("SELECT id, sku, barcode, name, department, unit, cost_price AS costPrice, selling_price AS sellingPrice, quantity FROM products WHERE active=1 AND quantity > 0 AND department<>'Cost of goods' ORDER BY name LIMIT 1000").all(),
     env.DB.prepare("SELECT id, account_number AS accountNumber, name, credit_limit AS creditLimit, balance, voucher_balance AS voucherBalance, status FROM customer_accounts WHERE status='ACTIVE' ORDER BY account_number").all(),
     env.DB.prepare("SELECT id, sale_number AS saleNumber, payment_method AS paymentMethod, account_number AS accountNumber, subtotal,discount_percent AS discountPercent,discount_amount AS discountAmount,total,status,created_at AS createdAt FROM pos_sales ORDER BY id DESC LIMIT 20").all(),
     session?env.DB.prepare("SELECT id,reference,movement_type AS movementType,amount,payment_method AS paymentMethod,note,created_at AS createdAt FROM till_movements WHERE till_session_id=? ORDER BY id DESC LIMIT 100").bind(session.id).all():Promise.resolve({results:[]}),
@@ -87,7 +87,8 @@ export async function POST(request: Request) {
       if (!account) return Response.json({ error: "A valid account number is required" }, { status: 400 });
     }
     for (const line of lines) {
-      const product = await env.DB.prepare("SELECT quantity FROM products WHERE id=?").bind(line.productId).first<{ quantity: number }>();
+      const product = await env.DB.prepare("SELECT quantity,department FROM products WHERE id=?").bind(line.productId).first<{ quantity: number;department:string }>();
+      if(product?.department==="Cost of goods")return Response.json({error:"Production inputs are cost stock. Sell the finished product instead."},{status:400});
       if (!product || product.quantity < line.quantity) return Response.json({ error: `Not enough stock for ${line.name}` }, { status: 409 });
     }
     const subtotal = lines.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0); const discountPercent=Math.min(100,Math.max(0,Number(payload.discountPercent)||0)); const discountAmount=Math.round(subtotal*discountPercent)/100; const total=subtotal-discountAmount; const discountFactor=subtotal>0?total/subtotal:1;

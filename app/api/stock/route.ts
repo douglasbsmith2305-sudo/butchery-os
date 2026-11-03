@@ -4,6 +4,7 @@ const DEFAULT_DEPARTMENTS = [
   ["Beef", "BEEF"], ["Pork", "PORK"], ["Chicken", "CHKN"], ["Lamb", "LAMB"], ["Game", "GAME"],
   ["Groceries", "GROC"], ["Cold Drinks", "DRNK"], ["Bakery", "BAKE"],
   ["Takeaways", "TAKE"], ["Biltong / Deli", "DELI"], ["Unmapped", "UNMP"],
+  ["Cost of goods", "COGS"],
 ];
 
 async function ensureSchema() {
@@ -13,6 +14,7 @@ async function ensureSchema() {
     db.prepare("CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY AUTOINCREMENT, sku TEXT NOT NULL UNIQUE, barcode TEXT, name TEXT NOT NULL, department TEXT NOT NULL, unit TEXT NOT NULL DEFAULT 'each', cost_price REAL NOT NULL DEFAULT 0, selling_price REAL NOT NULL DEFAULT 0, quantity REAL NOT NULL DEFAULT 0, imported_at TEXT NOT NULL)"),
     db.prepare("ALTER TABLE products ADD COLUMN IF NOT EXISTS vat_percent DOUBLE PRECISION NOT NULL DEFAULT 15"),
     db.prepare("ALTER TABLE products ADD COLUMN IF NOT EXISTS active INTEGER NOT NULL DEFAULT 1"),
+    db.prepare("ALTER TABLE products ADD COLUMN IF NOT EXISTS block_test_profile_code TEXT"),
     db.prepare("CREATE TABLE IF NOT EXISTS scale_devices (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, brand TEXT NOT NULL, connector_type TEXT NOT NULL, location TEXT NOT NULL, endpoint TEXT, database_table TEXT, active INTEGER NOT NULL DEFAULT 1, last_sync_at TEXT, last_sync_status TEXT NOT NULL DEFAULT 'NEVER', created_at TEXT NOT NULL)"),
     db.prepare("CREATE TABLE IF NOT EXISTS scale_product_mappings (id INTEGER PRIMARY KEY AUTOINCREMENT, device_id INTEGER NOT NULL, product_id INTEGER NOT NULL, plu TEXT NOT NULL, barcode_prefix TEXT NOT NULL DEFAULT '20', label_name TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 1, last_synced_price REAL, updated_at TEXT NOT NULL, UNIQUE(device_id,product_id), UNIQUE(device_id,plu), FOREIGN KEY(device_id) REFERENCES scale_devices(id), FOREIGN KEY(product_id) REFERENCES products(id))"),
     db.prepare("CREATE INDEX IF NOT EXISTS products_department_idx ON products(department)"),
@@ -51,7 +53,14 @@ export async function POST(request: Request) {
       if (!department) return Response.json({ error: "Choose a department" }, { status: 400 });
       const valid = await env.DB.prepare("SELECT name FROM departments WHERE name=? AND active=1").bind(department).first<{name:string}>();
       if (!valid) return Response.json({ error: "Department not found" }, { status: 404 });
-      await env.DB.prepare(`UPDATE products SET department=? WHERE active=1 AND id IN (${placeholders})`).bind(department, ...productIds).run();
+      if(department==="Cost of goods") {
+        const carcass=await env.DB.prepare(`SELECT id FROM products WHERE id IN (${placeholders}) AND block_test_profile_code IS NOT NULL LIMIT 1`).bind(...productIds).first();
+        if(carcass)return Response.json({error:"Keep automatic carcass and quarter inputs in their meat departments. Cost of goods is for additional production ingredients and packaging."},{status:400});
+      }
+      await env.DB.atomic([
+        env.DB.prepare(`UPDATE products SET department=? WHERE active=1 AND id IN (${placeholders})`).bind(department, ...productIds),
+        ...(department==="Cost of goods"?[env.DB.prepare(`UPDATE scale_product_mappings SET enabled=0,updated_at=? WHERE product_id IN (${placeholders})`).bind(new Date().toISOString(),...productIds)]:[]),
+      ]);
       return Response.json({ ok: true, updated: productIds.length, department });
     }
     const now = new Date().toISOString();

@@ -202,7 +202,7 @@ test("stock master supports safe bulk department assignment and removal", async 
 test("manager can access the shared accounts and calendar workspace", async () => {
   const page = await projectFile("app/page.tsx");
 
-  assert.match(page, /portal === "Manager" \? \["Manager overview", "Receiving", "Stock master", "Cooler inventory", "Orders", "Stock count", "Waste & loss", "Accounts & Calendar"\]/);
+  assert.match(page, /portal === "Manager" \? \["Manager overview", "Receiving", "Stock master", "Cooler inventory", "Orders", "Stock count", "Waste & loss", "Accounts & Calendar", "Costs"\]/);
   assert.match(page, /section === "Accounts & Calendar" \? <FinancialControl initialTab="Accounts overview" \/>/);
 });
 

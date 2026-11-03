@@ -44,6 +44,20 @@ function postgresSql(source: string) {
   return placeholders(sql);
 }
 
+function schemaScope() {
+  const schema=process.env.BUTCHERY_TEST_SCHEMA;
+  if(!schema)return null;
+  if(process.env.NODE_ENV==="production"||!/^butchery_cost_test_[a-f0-9]{16}$/.test(schema))throw new Error("Invalid isolated integration-test schema.");
+  return client().query(`SET LOCAL search_path TO "${schema}"`);
+}
+
+async function execute(sql:string,values:unknown[]) {
+  const scope=schemaScope();
+  if(!scope)return client().query(sql,values);
+  const result=await client().transaction([scope,client().query(sql,values)]);
+  return result[1];
+}
+
 class Statement {
   private values: unknown[] = [];
 
@@ -55,7 +69,7 @@ class Statement {
   }
 
   async all<T = Record<string, unknown>>(): Promise<QueryResult<T>> {
-    const rows = await client().query(postgresSql(this.source), this.values);
+    const rows = await execute(postgresSql(this.source), this.values);
     return { results: rows as T[] };
   }
 
@@ -69,10 +83,12 @@ class Statement {
     const insertTable = sql.match(/^\s*INSERT\s+INTO\s+["`]?([a-z_][a-z0-9_]*)/i)?.[1]?.toLowerCase();
     const returnsId = new Set(["pos_sales", "pos_sale_items", "customer_purchases", "butcher_orders", "payroll_runs", "scale_sync_jobs", "stock_receipts", "commission_staff", "commission_entries"]);
     if (insertTable && returnsId.has(insertTable) && !/\bRETURNING\b/i.test(sql)) sql = `${sql.replace(/;\s*$/, "")} RETURNING id`;
-    const rows = (await client().query(sql, this.values)) as unknown as Array<{ id?: number }>;
+    const rows = (await execute(sql, this.values)) as unknown as Array<{ id?: number }>;
     const id = Number(rows[0]?.id ?? 0);
     return { meta: { last_row_id: id } };
   }
+
+  query() { return client().query(postgresSql(this.source), this.values); }
 }
 
 let sqlClient: ReturnType<typeof neon> | undefined;
@@ -92,6 +108,10 @@ export const env = {
       const results = [];
       for (const statement of statements) results.push(await statement.run());
       return results;
+    },
+    async atomic(statements: Statement[]) {
+      const scope=schemaScope();
+      return client().transaction([...(scope?[scope]:[]),...statements.map(statement => statement.query())]);
     },
   },
 };

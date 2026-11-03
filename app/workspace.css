@@ -307,3 +307,55 @@ html:root .sandbox-lock span { color: var(--muted); }
   html:root .sandbox-lock { position: static; }
 }
 @media (prefers-reduced-motion: reduce) { html:root button { transition: none; } }
+
+/* Monthly expense register and production-input reconciliation. */
+.cost-period { display: block; min-width: 180px; color: var(--muted); font-size: 11px; }
+.cost-period input { display: block; width: 100%; height: 42px; padding: 0 12px; margin-top: 6px; border: 1px solid var(--line); }
+.cost-message { margin-bottom: 15px; color: var(--muted); font-size: 12px; }
+.cost-overview-grid, .cost-entry-layout { display: grid; grid-template-columns: 1.1fr 1fr; gap: 22px; margin-bottom: 22px; }
+.cost-profit-lines { padding: 9px 23px; }
+.cost-profit-lines > div { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 13px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+.cost-profit-lines span { color: var(--muted); }
+.cost-profit-lines b { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.cost-profit-lines .cost-result { margin-top: 7px; padding: 18px 0; }
+.cost-result strong { font-size: 24px; letter-spacing: -.04em; }
+.cost-help { margin: 0; padding: 15px 23px; color: var(--muted); font-size: 11px; line-height: 1.7; }
+.finance-form-body .cost-help { padding: 0; }
+.cost-explainer { padding: 20px 23px; margin: 20px 0; border: 1px solid var(--line); border-left: 3px solid var(--brand); border-radius: 8px; background: var(--panel); font-size: 12px; }
+.cost-explainer strong { color: var(--text); }
+.cost-explainer p { margin: 9px 0 0; color: var(--muted); line-height: 1.75; }
+.cost-breakdown { display: flex; gap: 16px; align-items: center; justify-content: space-between; padding: 14px 23px; border-bottom: 1px solid var(--line); font-size: 12px; }
+.cost-breakdown :is(strong, small), .cost-entry-row :is(strong, small) { display: block; }
+.cost-breakdown small, .cost-entry-row small { font-size: 10px; color: var(--muted); margin-top: 5px; }
+.cost-secondary { min-height: 34px; padding: 7px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel2); color: var(--text); font-size: 11px; }
+.cost-secondary:hover { background: var(--hover); }
+.cost-check { display: flex; align-items: center; gap: 8px; }
+.cost-check input { width: 16px; height: 16px; flex-shrink: 0; }
+.cost-check span { font-size: 10px; }
+.cost-item-form { background: var(--panel2); }
+.cost-register { margin-top: 22px; }
+.cost-entry-row { display: flex; align-items: center; gap: 18px; padding: 16px 23px; border-bottom: 1px solid var(--line); font-size: 12px; }
+.cost-entry-row > div { flex: 1; }
+.cost-entry-row.reversed { opacity: .55; }
+.cost-entry-row.reversed > b { text-decoration: line-through; }
+.cost-reversal { display: flex; align-items: end; gap: 10px; padding: 20px; background: var(--panel2); }
+.cost-reversal label { flex: 1; font-size: 11px; color: var(--muted); }
+.cost-reversal input { display: block; margin-top: 5px; height: 37px; width: 100%; padding: 0 10px; border: 1px solid var(--line); }
+.cost-material-scroll { overflow-x: auto; }
+.cost-material-row { display: grid; grid-template-columns: 1.5fr .7fr .85fr .85fr .7fr 1fr 1fr; align-items: center; gap: 14px; min-width: 1100px; padding: 16px 23px; border-bottom: 1px solid var(--line); font-size: 12px; }
+.cost-material-row.header { background: var(--panel2); color: var(--muted); font-size: 9px; letter-spacing: .04em; }
+.cost-material-row :is(strong, b, small) { display: block; }
+.cost-material-row small { margin-top: 5px; color: var(--muted); font-size: 10px; }
+.cost-material-row input:not([type="checkbox"]) { height: 38px; width: 100%; padding: 0 8px; border: 1px solid var(--line); }
+.cost-material-row input[readonly] { opacity: .6; }
+.owner-costs { margin-bottom: 22px; }
+html:root .loss-waterfall > div:last-child { grid-template-columns: repeat(3,minmax(0,1fr)); }
+@media(max-width:1000px) { .cost-overview-grid, .cost-entry-layout { grid-template-columns: 1fr; } }
+@media(max-width:760px) {
+  .cost-period { width: 100%; }
+  .cost-entry-row { flex-wrap: wrap; }
+  .cost-entry-row > div { flex-basis: 100%; }
+  .cost-reversal { flex-wrap: wrap; }
+  .cost-reversal label { flex-basis: 100%; }
+  html:root .loss-waterfall > div:last-child { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}

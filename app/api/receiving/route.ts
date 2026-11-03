@@ -1,5 +1,6 @@
 import { env } from "@/lib/db";
 import { BLOCK_TEST_PROFILES, blockTestProfile } from "@/lib/block-tests";
+import { PRODUCTION_DEPARTMENT } from "@/lib/cost-calculations";
 
 async function ensureSchema() {
   for (const profile of BLOCK_TEST_PROFILES) {
@@ -178,6 +179,11 @@ export async function POST(request: Request) {
         env.DB.prepare("UPDATE products SET quantity=quantity+?, cost_price=?, imported_at=? WHERE id=?").bind(line.quantityReceived, weightedCost, now, line.id),
         env.DB.prepare("INSERT INTO stock_ledger_entries (reference, product_id, product_name, quantity, unit, movement_type, direction, source, reason, created_at) VALUES (?, ?, ?, ?, ?, 'SUPPLIER_RECEIPT', 'IN', ?, ?, ?)").bind(receiptNumber, line.id, line.name, line.quantityReceived, line.unit, supplier.name, `Supplier invoice ${invoiceNumber}`, now),
       ];
+      if (line.department===PRODUCTION_DEPARTMENT) {
+        // Inputs are valued as stock; consumption is charged by the monthly cost reconciliation.
+        await env.DB.batch(coreStatements);
+        continue;
+      }
       if (calculatedPrice > line.sellingPrice + .004) {
         coreStatements.push(
           env.DB.prepare("UPDATE products SET selling_price=? WHERE id=?").bind(calculatedPrice, line.id),
