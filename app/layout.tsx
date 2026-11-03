@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./theme.css";
+import "./workspace.css";
 
 export const metadata: Metadata = {
   title: "George's Butchery OS — Trace every kilogram",

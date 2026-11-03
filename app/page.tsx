@@ -57,6 +57,27 @@ const seedBatches: Batch[] = [
 const kg = (value: number, digits = 2) => `${value.toLocaleString("en-ZA", { maximumFractionDigits: digits, minimumFractionDigits: digits })} kg`;
 const money = (value: number) => value.toLocaleString("en-ZA", { style: "currency", currency: "ZAR", maximumFractionDigits: 2 });
 
+function NavigationIcon({ name }: { name: string }) {
+  const paths: Record<string, string> = {
+    Receiving: "M12 3v12m-4-4 4 4 4-4M4 15v5h16v-5",
+    "Stock master": "M4 7h16v14H4zM3 3h18v4H3zm6 8h6",
+    "Cooler inventory": "M5 3h14v18H5zM5 10h14M9 6v1m0 7v3",
+    Orders: "M8 4H5v17h14V4h-3M8 2h8v5H8zm0 9h8m-8 5h5",
+    "Stock count": "m3 7 2 2 4-4m3 2h9M3 15l2 2 4-4m3 2h9",
+    "Waste & loss": "M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7",
+    "Accounts & Calendar": "M4 5h16v16H4zM8 3v4m8-4v4M4 10h16m-12 4h2m4 0h2m-8 4h2",
+    Pricing: "M3 3h9l9 9-9 9-9-9zm4 4h.01M10 14l4-4",
+    "Scale network": "M12 3v18M4 7h16M5 7l-4 8h8zm14 0-4 8h8zM7 21h10",
+    "Batch tracking": "m12 2 9 5v10l-9 5-9-5V7zm-9 5 9 5 9-5m-9 5v10M7 4l10 6",
+    Payroll: "M3 5h18v14H3zm0 4h18m-13 6h3m4 0h3",
+    Reports: "M4 3v18h17M8 17v-5m5 5V8m5 9V4",
+    Settings: "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M5 19l2-2M17 7l2-2",
+    Commission: "M4 20l5-5 4 2 7-10m-5 0h5v5M5 6a2 2 0 1 0 0 .01",
+    POS: "M3 3h18v12H3zm9 12v6m-5 0h10M7 7h10m-10 4h6",
+  };
+  return <svg className="navigation-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[name] ?? "M3 3h7v7H3zm11 0h7v7h-7zM3 14h7v7H3zm11 0h7v7h-7z"} /></svg>;
+}
+
 export default function Home() {
   const [portal, setPortal] = useState("Manager");
   const [section, setSection] = useState("Manager overview");
@@ -68,6 +89,19 @@ export default function Home() {
   const [batches, setBatches] = useState(seedBatches);
   const [notice, setNotice] = useState("");
   const [shiftLabel, setShiftLabel] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setMenuOpen(false);
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, [portal, section]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setMenuOpen(false); };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [menuOpen]);
 
   useEffect(() => {
     const saved = window.localStorage.getItem("butchery-os-theme");
@@ -117,23 +151,24 @@ export default function Home() {
   }
 
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
+    <div className={`app-shell${menuOpen ? " menu-open" : ""}`}>
+      {menuOpen ? <button className="navigation-backdrop" aria-label="Close navigation" onClick={() => setMenuOpen(false)} /> : null}
+      <aside className="sidebar" id="main-sidebar">
         <div className="brand">
-          <img src="/georges-butchery-logo.webp" alt="George's Butchery — Est 2010" />
+          <img src="/georges-butchery-logo.webp" alt="George's Butchery — Est 2016" />
           <div className="brand-label"><strong>OPERATING SYSTEM</strong><small>TRACE EVERY KILOGRAM</small></div>
         </div>
         <nav aria-label="Main navigation">
           <p>{portal === "Manager" ? "BUTCHERY MANAGER" : portal === "Cashier" ? "CASHIER" : portal === "Butcher" ? "BUTCHER COUNTER" : portal === "Sandbox" ? "SANDBOX · NO LIVE WRITES" : "OWNER BACK OFFICE"}</p>
-          {(portal === "Manager" ? ["Manager overview", "Receiving", "Stock master", "Cooler inventory", "Orders", "Stock count", "Waste & loss", "Accounts & Calendar"] : portal === "Cashier" ? ["POS"] : portal === "Butcher" ? ["Orders"] : portal === "Sandbox" ? ["Sandbox overview", "Receiving", "Stock master", "Cooler inventory", "Orders", "Stock count", "Waste & loss", "Owner overview", "Pricing", "Scale network", "Batch tracking", "Accounts & Calendar", "Payroll", "Reports", "Settings", "Commission"] : ["Owner overview", "Pricing", "Scale network", "Batch tracking", "Accounts & Calendar", "Payroll", "Reports", "Settings", "Commission"]).map((name, i) => <button key={name} className={section === name ? "active" : ""} onClick={() => setSection(name)}><span>{String(i + 1).padStart(2, "0")}</span>{name}</button>)}
+          {(portal === "Manager" ? ["Manager overview", "Receiving", "Stock master", "Cooler inventory", "Orders", "Stock count", "Waste & loss", "Accounts & Calendar"] : portal === "Cashier" ? ["POS"] : portal === "Butcher" ? ["Orders"] : portal === "Sandbox" ? ["Sandbox overview", "Receiving", "Stock master", "Cooler inventory", "Orders", "Stock count", "Waste & loss", "Owner overview", "Pricing", "Scale network", "Batch tracking", "Accounts & Calendar", "Payroll", "Reports", "Settings", "Commission"] : ["Owner overview", "Pricing", "Scale network", "Batch tracking", "Accounts & Calendar", "Payroll", "Reports", "Settings", "Commission"]).map((name) => <button key={name} className={section === name ? "active" : ""} aria-current={section === name ? "page" : undefined} onClick={() => { setSection(name); setMenuOpen(false); }}><NavigationIcon name={name} /><span className="navigation-label">{name}</span>{section === name ? <i className="navigation-active-dot" /> : null}</button>)}
         </nav>
-        <div className="operator"><span>NM</span><div><strong>Naledi Mokoena</strong><small>Warehouse operator</small></div></div>
+        <div className="operator"><span>G</span><div><strong>George&apos;s Butchery</strong><small>{portal === "Owner" ? "Back office workspace" : `${portal} workspace`}</small></div><i className="operator-dot" /></div>
       </aside>
 
       <main>
         <header className="topbar">
-          <button className="mobile-menu" aria-label="Open menu">☰</button>
-          <div className="topbar-brand"><strong>GEORGE&apos;S BUTCHERY</strong><span><i className="live-dot" /> LEDGER ONLINE</span></div>
+          <button className="mobile-menu" aria-label={menuOpen ? "Close menu" : "Open menu"} aria-expanded={menuOpen} aria-controls="main-sidebar" onClick={() => setMenuOpen(current => !current)}>{menuOpen ? "×" : "☰"}</button>
+          <div className="topbar-brand"><strong>{portal === "Owner" ? "Back office" : portal === "Sandbox" ? "Sand-box" : portal}<span className="header-divider">/</span><span className="header-section">{section.replace(/^(Manager|Owner|Sandbox) /, "")}</span></strong><span className="ledger-status"><i className="live-dot" /> LIVE</span></div>
           <div className="portal-switch" aria-label="Choose work area">{[["Manager", "Manager"], ["Cashier", "Cashier"], ["Butcher", "Butcher"], ["Back office", "Owner"], ["Sand-box", "Sandbox"]].map(([label, target]) => <button key={target} className={portal === target ? "active" : ""} onClick={() => { setPortal(target); setSection(target === "Manager" ? "Manager overview" : target === "Cashier" ? "POS" : target === "Butcher" ? "Orders" : target === "Sandbox" ? "Sandbox overview" : "Owner overview"); }}>{label}</button>)}</div>
           <div className="shift">{shiftLabel}</div>
           <button className="theme-toggle" type="button" role="switch" aria-checked={theme === "dark"} aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`} onClick={toggleTheme}><span aria-hidden="true">{theme === "light" ? "☼" : "☾"}</span><b>{theme === "light" ? "LIGHT" : "DARK"}</b><i aria-hidden="true" /></button>

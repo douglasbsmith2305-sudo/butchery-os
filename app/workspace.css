@@ -1,0 +1,308 @@
+/* Shared visual language for every George's workspace. Loaded after legacy modules. */
+html:root {
+  --bg: #f5f6f8;
+  --panel: #fff;
+  --panel2: #f8f9fb;
+  --line: #e5e7ec;
+  --text: #24272e;
+  --muted: #737b89;
+  --brand: #d92f3b;
+  --green: #16835b;
+  --amber: #b27715;
+  --accent-soft: #fdf0f1;
+  --success-soft: #edf7f2;
+  --warning-soft: #fff7e8;
+  --hover: #f2f4f7;
+  --shadow: 0 3px 16px #17203404;
+  color-scheme: light;
+}
+html:root.dark-theme {
+  --bg: #101216;
+  --panel: #191c22;
+  --panel2: #20242c;
+  --line: #2d323c;
+  --text: #edf0f5;
+  --muted: #a1a9b7;
+  --brand: #ef5360;
+  --green: #65caa0;
+  --amber: #e7b665;
+  --accent-soft: #362027;
+  --success-soft: #1c322a;
+  --warning-soft: #332c20;
+  --hover: #242a34;
+  --shadow: none;
+}
+html:root body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-size: 14px;
+  line-height: 1.5;
+}
+html:root button, html:root input, html:root select, html:root textarea { font-family: inherit; }
+html:root button { transition: background-color .15s, border-color .15s, box-shadow .15s; }
+html:root button:focus-visible, html:root a:focus-visible { outline: 3px solid var(--brand); outline-offset: 3px; }
+html:root button:disabled { cursor: not-allowed; }
+html:root .app-shell { grid-template-columns: 244px minmax(0, 1fr); }
+html:root .sidebar {
+  z-index: 100;
+  padding: 25px 15px 20px;
+  background: #191b20;
+  border: 0;
+  box-shadow: none;
+  color: #edf0f5;
+}
+html:root .brand { padding: 0 11px 24px; }
+html:root .brand img { height: 101px; border-radius: 9px; background: #000; }
+html:root .brand-label { border-color: #34363d; padding-top: 14px; margin-top: 16px; }
+html:root .brand strong { font-size: 8px; color: #d1d5de; letter-spacing: .14em; }
+html:root .brand small { font-size: 7px; color: #8a909d; letter-spacing: .08em; }
+html:root .sidebar nav { scrollbar-color: #454852 transparent; }
+html:root .sidebar nav p { color: #8d94a2; margin: 7px 13px 15px; font-size: 9px; letter-spacing: .13em; }
+html:root .sidebar nav button { min-height: 46px; margin-bottom: 5px; gap: 12px; border-radius: 8px; padding: 10px 13px; color: #aeb5c1; }
+html:root .sidebar nav button .navigation-label { color: inherit; font: inherit; font-size: 12px; font-weight: 500; }
+html:root .sidebar nav button:hover { background: #282b33; color: #fff; }
+html:root .sidebar nav button.active { background: #d92f3b; box-shadow: 0 4px 12px #0002; color: #fff; }
+.navigation-icon { flex-shrink: 0; opacity: .86; }
+.navigation-active-dot { width: 5px; height: 5px; margin-left: auto; border-radius: 50%; background: #fff; }
+html:root .operator { padding: 18px 7px 0; border-color: #34363d; margin-top: auto; }
+html:root .operator > span { background: #343139; color: #f1b0b7; width: 35px; height: 35px; border-radius: 10px; font-weight: 700; font-size: 14px; }
+html:root .operator strong { color: #e2e6ed; font-size: 11px; }
+html:root .operator small { color: #939baa; font-size: 10px; }
+.operator-dot { margin-left: auto; width: 6px; height: 6px; border-radius: 50%; background: #65caa0; }
+html:root .topbar { position: sticky; top: 0; z-index: 60; height: 76px; padding: 0 32px; gap: 18px; background: var(--panel); border-color: var(--line); backdrop-filter: none; letter-spacing: 0; }
+html:root .topbar-brand { gap: 10px; min-width: 0; }
+html:root .topbar-brand strong { display: flex; align-items: center; gap: 10px; color: var(--text); font-size: 12px; letter-spacing: 0; font-weight: 600; white-space: nowrap; }
+html:root .topbar-brand .header-divider { color: var(--line); font-size: 19px; font-weight: 400; }
+html:root .topbar-brand .header-section { font-size: 12px; color: var(--muted); font-weight: 400; text-transform: capitalize; }
+html:root .topbar-brand .ledger-status { font-size: 8px; color: var(--green); letter-spacing: .06em; padding: 3px 6px; background: var(--success-soft); border-radius: 4px; }
+html:root .live-dot { width: 5px; height: 5px; margin-right: 4px; background: var(--green); box-shadow: none; }
+html:root .portal-switch { padding: 4px; gap: 2px; border: 1px solid var(--line) !important; background: var(--panel2) !important; border-radius: 9px; box-shadow: none; }
+html:root .portal-switch button { height: 32px; padding: 0 10px; font-size: 9px; letter-spacing: .015em; text-transform: none; color: var(--muted) !important; border-radius: 6px; }
+html:root .portal-switch button.active { background: var(--panel) !important; color: var(--text) !important; box-shadow: 0 1px 5px #0001; }
+html:root .shift { color: var(--muted); font-size: 9px; letter-spacing: .035em; white-space: nowrap; }
+html:root .theme-toggle { background: var(--panel2); color: var(--muted); border-color: var(--line); height: 34px; min-width: 77px; }
+html:root .theme-toggle span { color: var(--text); }
+html:root .theme-toggle b { font-size: 7px; }
+html:root .theme-toggle i { background: var(--line); }
+html:root .content { max-width: 1640px; padding: 35px 32px 70px; }
+html:root .eyebrow { font-size: 10px; color: var(--muted); letter-spacing: .12em; }
+html:root .page-heading { gap: 24px; align-items: center; margin: 9px 0 28px; }
+html:root .page-heading h1, html:root .owner-command h1 { font-size: clamp(25px, 2.2vw, 34px); letter-spacing: -.045em; line-height: 1.2; font-weight: 650; margin-bottom: 10px; }
+html:root .page-heading p, html:root .owner-command p { color: var(--muted); font-size: 13px; max-width: 710px; line-height: 1.65; }
+html:root .status-pill { flex-shrink: 0; max-width: 360px; font-size: 9px; letter-spacing: .04em; padding: 8px 11px; border-color: var(--line); background: var(--panel); color: var(--muted); border-radius: 7px; line-height: 1.5; }
+html:root .panel { background: var(--panel); border-color: var(--line); border-radius: 12px; box-shadow: var(--shadow); }
+html:root .panel-head { min-height: 83px; gap: 14px; padding: 20px 23px; border-color: var(--line); }
+html:root .panel-head small { color: var(--muted); font-size: 9px; letter-spacing: .11em; }
+html:root .panel-head h2 { color: var(--text); font-size: 16px; font-weight: 600; letter-spacing: -.025em; margin: 5px 0 0; }
+html:root .panel-head > span, html:root .panel-head button { color: var(--muted); font-size: 11px; line-height: 1.6; }
+html:root :is(.stat-grid, .owner-kpis, .receiving-kpis, .sandbox-kpis) { display: grid; gap: 16px; background: transparent; border: 0; overflow: visible; margin-bottom: 25px; border-radius: 0; }
+html:root :is(.stat-grid, .owner-kpis, .receiving-kpis, .sandbox-kpis) article { padding: 22px; background: var(--panel); border: 1px solid var(--line) !important; border-radius: 11px; box-shadow: var(--shadow); }
+html:root :is(.stat-grid, .owner-kpis, .receiving-kpis, .sandbox-kpis) article small { color: var(--muted); font-size: 9px; font-weight: 600; letter-spacing: .08em; }
+html:root :is(.stat-grid, .owner-kpis, .receiving-kpis, .sandbox-kpis) article strong { color: var(--text); font-size: clamp(21px, 2vw, 29px); font-weight: 650; letter-spacing: -.04em; margin: 14px 0 6px; font-variant-numeric: tabular-nums; }
+html:root :is(.stat-grid, .owner-kpis, .receiving-kpis, .sandbox-kpis) article :is(span, em) { font-size: 11px; color: var(--muted); font-style: normal; line-height: 1.5; }
+html:root .receiving-kpis article:last-child strong { font-size: 23px; }
+html:root :is(.overview-actions, .owner-operations) { gap: 16px; margin-bottom: 26px; }
+html:root :is(.overview-actions, .owner-grid, .owner-operations) button { padding: 22px; background: var(--panel) !important; color: var(--text) !important; border: 1px solid var(--line); border-radius: 11px; box-shadow: var(--shadow); }
+html:root :is(.overview-actions, .owner-grid, .owner-operations) button:hover { background: var(--panel) !important; border-color: var(--brand); box-shadow: 0 4px 16px #17203409; }
+html:root :is(.overview-actions, .owner-grid, .owner-operations) small { color: var(--brand); font-size: 9px; letter-spacing: .08em; }
+html:root :is(.overview-actions, .owner-grid, .owner-operations) strong { color: var(--text); font-size: 15px; font-weight: 600; }
+html:root :is(.overview-actions, .owner-grid, .owner-operations) span { color: var(--muted); font-size: 11px; line-height: 1.6; }
+html:root .overview-actions button > b { color: var(--brand); }
+/* Forms use one consistent field treatment in both themes. */
+html:root body :is(input, select, textarea) { background: var(--panel) !important; color: var(--text) !important; border-color: var(--line) !important; border-radius: 7px; font-size: 12px; box-shadow: none; }
+html:root body :is(input, select, textarea):focus { outline: 3px solid var(--accent-soft) !important; border-color: var(--brand) !important; }
+html:root input::placeholder, html:root textarea::placeholder { color: var(--muted); opacity: .85; }
+html:root input[type="checkbox"] { accent-color: var(--brand); cursor: pointer; }
+html:root :is(.form-grid, .receiving-fields, .finance-form-body, .product-search-box, .order-customer, .sandbox-form, .sandbox-settings, .cashup-form) label { color: var(--muted); font-size: 11px; font-weight: 500; }
+html:root :is(.form-grid, .receiving-fields, .finance-form-body) { gap: 18px; padding: 23px; }
+html:root :is(.receiving-fields, .finance-form-body, .form-grid) :is(input:not([type="checkbox"]), select), html:root .product-search-box input { height: 45px; }
+html:root .primary-action, html:root .complete-sale, html:root .receipt-submit button, html:root .publish-prices button, html:root .product-entry button { border-radius: 8px; background: var(--brand); color: #fff; font-size: 12px; font-weight: 600; min-height: 46px; }
+html:root .primary-action:hover, html:root .complete-sale:hover { background: #c32330; color: #fff; }
+html:root .receiving-supplier-field { grid-template-columns: 1fr; gap: 6px; }
+html:root .receiving-supplier-field > button { width: fit-content; height: 28px; padding: 0; border: 0; background: transparent; color: var(--brand); font-size: 11px; }
+html:root .supplier-create-inline { grid-template-columns: 1fr 1fr; background: var(--panel2); padding: 18px; }
+html:root .supplier-create-inline > div { grid-column: 1/-1; }
+html:root .supplier-create-inline > div strong { font-size: 13px; }
+html:root .supplier-create-inline > div span { font-size: 11px; }
+html:root .supplier-create-inline button { font-size: 11px; }
+html:root .accounts-check { background: var(--panel2); border-color: var(--line); }
+html:root .receiving-fields .accounts-check span { color: var(--muted); font-size: 11px; line-height: 1.6; }
+html:root .receipt-submit { background: var(--panel2); padding: 22px; }
+html:root .receipt-submit div span { color: var(--muted); font-size: 11px; }
+html:root .receipt-submit div strong { font-size: 28px; }
+html:root .receiving-rule, html:root .scale-bridge-note, html:root .payroll-compliance, html:root .payroll-rule, html:root .due-alert { background: var(--warning-soft); border-color: var(--amber); }
+html:root :is(.receiving-rule, .scale-bridge-note, .payroll-rule) span, html:root .payroll-compliance, html:root .due-alert p { color: var(--muted); font-size: 11px; line-height: 1.6; }
+html:root .block-preview, html:root .logic-note, html:root .example-callout, html:root .notice { background: var(--success-soft); border-color: var(--line); }
+html:root .block-preview > div:last-child > span { background: var(--panel); border-color: var(--line); }
+html:root .block-preview em, html:root .block-preview b { color: var(--text); }
+html:root .block-preview > div:first-child span { color: var(--muted); font-size: 10px; }
+/* Stock selection and table rows stay in the same colour system. */
+html:root .department-grid { gap: 12px; }
+html:root .department-grid button { background: var(--panel); color: var(--text); border-color: var(--line); border-radius: 9px; box-shadow: none; }
+html:root .department-grid button:hover, html:root .department-grid button.selected { background: var(--accent-soft); border-color: var(--brand); }
+html:root .department-grid strong { font-size: 14px; }
+html:root .department-grid :is(small, span) { color: var(--muted); font-size: 10px; }
+html:root .upload-zone { background: var(--panel2); border-color: var(--line); color: var(--muted); border-radius: 9px; }
+html:root .upload-zone:hover { background: var(--hover); }
+html:root .upload-zone strong { color: var(--text); font-size: 13px; }
+html:root .upload-zone span { font-size: 11px; }
+html:root .create-dept p { color: var(--muted); font-size: 11px; }
+html:root .stock-toolbar { padding: 18px 22px; background: var(--panel); }
+html:root .bulk-stock-toolbar { background: var(--panel2); border-color: var(--line); padding: 13px 22px; box-shadow: none; }
+html:root .bulk-stock-toolbar label { color: var(--muted); font-size: 11px; }
+html:root .bulk-stock-toolbar strong { font-size: 11px; }
+html:root .bulk-stock-toolbar select { background: var(--panel) !important; color: var(--text) !important; border-color: var(--line) !important; }
+html:root .bulk-stock-toolbar button { background: var(--accent-soft); color: var(--brand); border-color: var(--line); font-size: 11px; }
+html:root .bulk-stock-toolbar button:disabled { background: var(--panel2); color: var(--muted); border-color: var(--line); }
+html:root .product-row { min-height: 58px; padding: 10px 22px; font-size: 12px; border-color: var(--line); }
+html:root .product-row strong { font-size: 12px; font-weight: 550; }
+html:root .product-row b { color: var(--muted); font-size: 11px; font-weight: 500; }
+html:root .product-row span { color: var(--muted); }
+html:root .product-row:hover { background: var(--panel2); }
+html:root .product-row.selectable.selected { background: var(--accent-soft); }
+html:root :is(.product-row, .price-row, .report-row, .receipt-line, .inventory-row, .account-row, .payroll-run-row, .payroll-status-row, .commission-staff-row, .commission-entry-row, .scale-map-row, .sandbox-row, .sandbox-price-row).header { min-height: 42px; background: var(--panel2); color: var(--muted); font-size: 9px; letter-spacing: .07em; }
+html:root :is(.price-row, .report-row, .receipt-line, .inventory-row, .account-row, .payroll-run-row, .payroll-status-row, .commission-staff-row, .commission-entry-row, .scale-map-row, .sandbox-row, .sandbox-price-row) { color: var(--text); font-size: 12px; border-color: var(--line); }
+html:root :is(.price-row, .report-row, .receipt-line, .inventory-row, .account-row, .payroll-run-row, .payroll-status-row, .commission-staff-row, .commission-entry-row, .scale-map-row) :is(strong, b) { font-size: 12px; }
+html:root :is(.price-row, .receipt-line, .payroll-run-row, .commission-staff-row, .commission-entry-row, .scale-map-row) small { color: var(--muted); font-size: 10px; }
+html:root :is(.report-row, .price-row, .inventory-row) > span { color: var(--muted); }
+html:root :is(.recent-panel article, .recent-receipts article, .finance-list article, .performance-row, .purchase-card, .purchase-item, .history-row) { border-color: var(--line); }
+html:root .recent-panel :is(strong, b), html:root .recent-receipts article strong, html:root .finance-list :is(strong, b) { font-size: 12px; }
+html:root .recent-panel :is(small, time), html:root .recent-receipts article small, html:root .finance-list small { color: var(--muted); font-size: 10px; }
+html:root .batch-icon { background: var(--panel2); color: var(--muted); border-color: var(--line); border-radius: 8px; width: 35px; height: 35px; }
+html:root .receipt-products span { background: var(--panel2); color: var(--muted); border-color: var(--line); font-size: 10px; }
+html:root .receipt-products span b { color: var(--text); }
+html:root .empty-stock, html:root .receiving-empty { color: var(--muted); font-size: 12px; padding: 38px 22px; }
+html:root .receiving-empty strong { color: var(--text); font-size: 13px; }
+html:root .receiving-empty span { color: var(--muted); font-size: 11px; }
+/* Owner, accounts, payroll and reports. */
+html:root .owner-command { align-items: center; gap: 24px; }
+html:root .owner-command h1 { margin-top: 10px; }
+html:root .owner-main-grid { gap: 22px; }
+html:root .owner-performance-grid > div { border-color: var(--line); padding: 23px; }
+html:root .owner-performance-grid small { color: var(--muted); font-size: 10px; }
+html:root .owner-performance-grid span { color: var(--muted); font-size: 11px; }
+html:root .owner-performance-grid strong { font-size: 25px; }
+html:root .owner-attention > button { border-color: var(--line); color: var(--text); padding: 15px 18px; }
+html:root .owner-attention > button:hover { background: var(--panel2); }
+html:root .owner-attention > button span { font-size: 12px; }
+html:root .owner-attention > button strong { font-size: 10px; color: var(--muted); }
+html:root .owner-attention > button b { background: var(--warning-soft); }
+html:root .owner-access > button { background: var(--panel); color: var(--text); border-color: var(--line); font-size: 12px; }
+html:root .owner-access > div { background: var(--panel); border-color: var(--line); box-shadow: 0 12px 40px #0002; }
+html:root .owner-access > div button { color: var(--text); }
+html:root .owner-access > div button:hover { background: var(--panel2); }
+html:root .performance-split > .panel { background: var(--panel) !important; }
+html:root .performance-row { min-height: 74px; }
+html:root .performance-row strong, html:root .performance-row > span { font-size: 12px; }
+html:root .performance-row small { color: var(--muted); font-size: 10px; }
+html:root .performance-row > b { background: var(--success-soft); }
+html:root .performance-row.under > b { background: var(--warning-soft); }
+html:root :is(.portfolio-target, .scale-command, .commission-target) { background: var(--panel) !important; padding: 22px; border-radius: 12px; }
+html:root :is(.portfolio-target, .price-publish-options, .publish-prices) label { color: var(--muted); font-size: 11px; }
+html:root :is(.price-publish-options, .publish-prices, .current-margin) { background: var(--panel2); color: var(--text); border-color: var(--line); }
+html:root :is(.byproduct-explainer > div, .byproduct-explainer article, .account-summary article, .account-title) { background: var(--panel); border-color: var(--line); color: var(--text); }
+html:root :is(.byproduct-explainer, .account-summary, .account-title) :is(p, span, small) { color: var(--muted); font-size: 11px; }
+html:root .finance-tabs, html:root .pos-tabs { gap: 6px; border: 0; margin-bottom: 22px; flex-wrap: wrap; }
+html:root .finance-tabs button, html:root .pos-tabs button { color: var(--muted) !important; padding: 10px 16px; border: 1px solid transparent; border-radius: 7px; font-size: 12px; background: transparent !important; }
+html:root .finance-tabs button.active, html:root body .pos-tabs button.active { color: var(--brand) !important; background: var(--accent-soft) !important; border-color: transparent; font-weight: 600; }
+html:root :is(.finance-tabs, .pos-tabs) > span { color: var(--muted); font-size: 11px; }
+html:root .account-row { color: var(--text); }
+html:root .account-row:hover, html:root .purchase-heading:hover { background: var(--panel2); }
+html:root .purchase-heading { color: var(--text); }
+html:root .purchase-items, html:root .payroll-preview > footer { background: var(--panel2); border-color: var(--line); }
+html:root .payroll-lines > div { font-size: 12px; border-color: var(--line); }
+html:root .payroll-lines span, html:root .payroll-run-row small, html:root .payroll-status-row small { color: var(--muted); }
+html:root .google-calendar, html:root .google-calendar .calendar-grid > div { background: var(--panel); border-color: var(--line); }
+html:root .google-calendar .calendar-grid > div.outside { background: var(--panel2); }
+html:root .google-calendar .calendar-grid > div.tomorrow { background: var(--warning-soft); }
+html:root .calendar-grid b, html:root .calendar-toolbar button { color: var(--text); }
+html:root .calendar-event { background: var(--success-soft); color: var(--green); }
+html:root .calendar-event span { color: var(--muted); }
+/* Touch-friendly checkout and preparation queues. */
+html:root :is(.pos-basket, .pos-products, .pos-control-card, .till-summary, .recent-pos, .order-column, .order-card) { background: var(--panel) !important; border-color: var(--line) !important; }
+html:root .pos-layout { gap: 22px; grid-template-columns: minmax(0, 1.3fr) minmax(340px, .85fr); align-items: start; }
+html:root .pos-search { padding: 22px; border-color: var(--line); }
+html:root .pos-search input { height: 48px; font-size: 13px; }
+html:root .pos-product-grid { gap: 12px; padding: 0 22px 22px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+html:root .pos-product-grid button { padding: 17px; min-height: 145px; background: var(--panel) !important; color: var(--text) !important; border-color: var(--line) !important; border-radius: 9px; }
+html:root .pos-product-grid button:hover { background: var(--accent-soft) !important; border-color: var(--brand) !important; }
+html:root .pos-product-grid strong { font-size: 12px; line-height: 1.5; }
+html:root .pos-product-grid small, html:root .pos-product-grid em { font-size: 9px; color: var(--muted); }
+html:root .pos-product-grid span { font-size: 14px; color: var(--brand); }
+html:root body .pos-payment { background: var(--panel2) !important; border-color: var(--line); padding: 22px; }
+html:root .pos-total strong { font-size: 29px; color: var(--text); }
+html:root .pos-total span { color: var(--muted); }
+html:root .basket-lines > div { border-color: var(--line); }
+html:root .basket-lines strong { font-size: 12px; }
+html:root .payment-buttons { gap: 7px; }
+html:root .payment-buttons button { min-height: 43px; background: var(--panel) !important; color: var(--muted) !important; border-color: var(--line) !important; font-size: 11px; border-radius: 7px; }
+html:root .payment-buttons button.active { background: var(--accent-soft) !important; color: var(--brand) !important; border-color: var(--brand) !important; }
+html:root .discount-block { color: var(--muted); background: var(--panel); border-color: var(--line); }
+html:root .till-closed-warning { background: var(--warning-soft); color: var(--amber); font-size: 11px; }
+html:root .order-column > header { background: var(--panel2) !important; color: var(--text); border-color: var(--line); }
+html:root .destination-tabs button { color: var(--muted); border-color: var(--line); background: var(--panel); font-size: 12px; }
+html:root .destination-tabs button.active { background: var(--accent-soft); color: var(--brand); border-color: var(--brand); }
+html:root .product-search-results { background: var(--panel); border-color: var(--line); box-shadow: 0 12px 35px #0002; }
+html:root .product-search-results button { color: var(--text); border-color: var(--line); }
+html:root .product-search-results button:hover { background: var(--panel2); }
+html:root .sandbox-lock { top: 91px; background: var(--warning-soft); border-color: var(--amber); box-shadow: none; }
+html:root .sandbox-lock span { color: var(--muted); }
+.navigation-backdrop { display: none; }
+@media (min-width: 761px) and (max-width: 1250px) {
+  html:root .app-shell { grid-template-columns: 215px minmax(0, 1fr); }
+  html:root .topbar { padding: 0 22px; gap: 10px; flex-wrap: wrap; height: 98px; align-content: center; row-gap: 7px; }
+  html:root .topbar-brand { flex-basis: calc(100% - 200px); }
+  html:root .portal-switch { order: 4; }
+  html:root .shift { margin-left: auto; }
+  html:root .content { padding: 28px 22px 60px; }
+  html:root .pos-layout { grid-template-columns: 1fr; }
+  html:root .sandbox-lock { top: 110px; }
+}
+@media (max-width: 1000px) {
+  html:root .page-heading { align-items: flex-start; flex-direction: column; gap: 12px; }
+  html:root .status-pill { max-width: 100%; }
+  html:root .overview-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  html:root .app-shell { display: block; }
+  html:root .sidebar { display: none; position: fixed; width: 260px; top: 62px; bottom: 74px; height: auto; padding-top: 20px; }
+  html:root .menu-open .sidebar { display: flex; }
+  html:root .navigation-backdrop { display: block; position: fixed; inset: 62px 0 0; z-index: 90; border: 0; background: #0c101a80; backdrop-filter: blur(2px); }
+  html:root .topbar { height: 62px; padding: 0 15px; gap: 12px; z-index: 110; }
+  html:root .mobile-menu { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; font-size: 19px; border-color: var(--line); background: var(--panel2); color: var(--text); }
+  html:root .topbar-brand { margin-right: auto; }
+  html:root .topbar-brand strong { font-size: 11px; gap: 7px; }
+  html:root .topbar-brand .header-section { font-size: 11px; }
+  html:root .ledger-status, html:root .shift { display: none; }
+  html:root .portal-switch { position: fixed; left: 10px; right: 10px; bottom: max(10px, env(safe-area-inset-bottom)); z-index: 120; justify-content: stretch; padding: 5px; box-shadow: 0 4px 25px #0002; background: var(--panel) !important; }
+  html:root .portal-switch button { flex: 1; height: 43px; padding: 0 4px; font-size: 10px; }
+  html:root .portal-switch button.active { color: var(--brand) !important; background: var(--accent-soft) !important; box-shadow: none; }
+  html:root .content { padding: 26px 16px 100px; }
+  html:root .page-heading h1, html:root .owner-command h1 { font-size: 27px; }
+  html:root .page-heading p, html:root .owner-command p { font-size: 12px; margin-bottom: 0; }
+  html:root .panel-head { padding: 18px; min-height: 77px; }
+  html:root .panel-head h2 { font-size: 15px; }
+  html:root :is(.stat-grid, .owner-kpis, .receiving-kpis, .sandbox-kpis) { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  html:root :is(.stat-grid, .owner-kpis, .receiving-kpis, .sandbox-kpis) article { padding: 16px; }
+  html:root :is(.stat-grid, .owner-kpis, .receiving-kpis, .sandbox-kpis) article strong { font-size: 21px; overflow-wrap: anywhere; }
+  html:root :is(.stat-grid, .owner-kpis, .receiving-kpis, .sandbox-kpis) article small { font-size: 8px; }
+  html:root :is(.stat-grid, .owner-kpis, .receiving-kpis, .sandbox-kpis) article :is(span, em) { font-size: 10px; }
+  html:root .overview-actions { grid-template-columns: 1fr; gap: 10px; }
+  html:root .overview-actions button { min-height: 105px; }
+  html:root :is(.form-grid, .receiving-fields, .finance-form-body) { padding: 18px; }
+  html:root .supplier-create-inline { grid-template-columns: 1fr; }
+  html:root .supplier-create-inline > div { grid-column: auto; }
+  html:root .bulk-stock-toolbar { padding: 14px 18px; }
+  html:root .bulk-stock-toolbar select { width: 100%; min-width: 0; }
+  html:root .pos-layout { grid-template-columns: 1fr; }
+  html:root .pos-product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0 16px 16px; gap: 10px; }
+  html:root .pos-product-grid button { padding: 13px; min-height: 125px; }
+  html:root .pos-search { padding: 16px; }
+  html:root .finance-tabs, html:root .pos-tabs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 5px; }
+  html:root .finance-tabs button, html:root .pos-tabs button { flex-shrink: 0; padding: 10px 13px; font-size: 11px; white-space: nowrap; }
+  html:root .pos-tabs > span { display: none; }
+  html:root .sandbox-lock { position: static; }
+}
+@media (prefers-reduced-motion: reduce) { html:root button { transition: none; } }
