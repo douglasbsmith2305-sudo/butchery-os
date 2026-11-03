@@ -173,6 +173,26 @@ test("stock imports preserve source VAT and scale PLU codes", async () => {
   assert.match(migration, /vat_percent/);
 });
 
+test("stock master supports safe bulk department assignment and removal", async () => {
+  const [page, stock, migration, styles] = await Promise.all([
+    projectFile("app/page.tsx"),
+    projectFile("app/api/stock/route.ts"),
+    projectFile("drizzle/0018_product_bulk_actions.sql"),
+    projectFile("app/globals.css"),
+  ]);
+
+  assert.match(page, /Select all \{visible\.length\} matching/);
+  assert.match(page, /What to do…/);
+  assert.match(page, /Assign to department/);
+  assert.match(page, /Delete from active stock/);
+  assert.match(stock, /payload\.action === "bulk_assign"/);
+  assert.match(stock, /payload\.action === "bulk_delete"/);
+  assert.match(stock, /UPDATE products SET active=0/);
+  assert.match(stock, /UPDATE scale_product_mappings SET enabled=0/);
+  assert.match(migration, /ADD COLUMN IF NOT EXISTS active/);
+  assert.match(styles, /\.bulk-stock-toolbar/);
+});
+
 test("manager can access the shared accounts and calendar workspace", async () => {
   const page = await projectFile("app/page.tsx");
 

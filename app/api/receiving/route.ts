@@ -11,6 +11,7 @@ async function ensureSchema() {
     db.prepare("CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY AUTOINCREMENT, sku TEXT NOT NULL UNIQUE, barcode TEXT, name TEXT NOT NULL, department TEXT NOT NULL, unit TEXT NOT NULL DEFAULT 'each', cost_price REAL NOT NULL DEFAULT 0, selling_price REAL NOT NULL DEFAULT 0, quantity REAL NOT NULL DEFAULT 0, imported_at TEXT NOT NULL)"),
     db.prepare("ALTER TABLE products ADD COLUMN IF NOT EXISTS target_margin_percent DOUBLE PRECISION NOT NULL DEFAULT 0"),
     db.prepare("ALTER TABLE products ADD COLUMN IF NOT EXISTS block_test_profile_code TEXT"),
+    db.prepare("ALTER TABLE products ADD COLUMN IF NOT EXISTS active INTEGER NOT NULL DEFAULT 1"),
     db.prepare("CREATE TABLE IF NOT EXISTS suppliers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, payment_terms_days INTEGER NOT NULL DEFAULT 7, contact TEXT, active INTEGER NOT NULL DEFAULT 1)"),
     db.prepare("CREATE TABLE IF NOT EXISTS supplier_invoices (id INTEGER PRIMARY KEY AUTOINCREMENT, supplier_id INTEGER NOT NULL, invoice_number TEXT NOT NULL UNIQUE, delivery_date TEXT NOT NULL, due_date TEXT NOT NULL, amount REAL NOT NULL, balance REAL NOT NULL, status TEXT NOT NULL DEFAULT 'OPEN', created_at TEXT NOT NULL, FOREIGN KEY(supplier_id) REFERENCES suppliers(id))"),
     db.prepare("CREATE TABLE IF NOT EXISTS stock_receipts (id INTEGER PRIMARY KEY AUTOINCREMENT, receipt_number TEXT NOT NULL UNIQUE, supplier_id INTEGER NOT NULL, supplier_name TEXT NOT NULL, invoice_number TEXT NOT NULL, delivery_date TEXT NOT NULL, notes TEXT, total_cost REAL NOT NULL DEFAULT 0, created_at TEXT NOT NULL, FOREIGN KEY(supplier_id) REFERENCES suppliers(id))"),
@@ -29,7 +30,7 @@ async function ensureSchema() {
   ]);
   const now = new Date().toISOString();
   await db.batch(BLOCK_TEST_PROFILES.flatMap(profile => [
-    db.prepare("INSERT INTO products (sku,barcode,name,department,unit,cost_price,selling_price,quantity,imported_at,block_test_profile_code) VALUES (?,NULL,?,?, 'kg',0,0,0,?,?) ON CONFLICT(sku) DO UPDATE SET name=excluded.name,department=excluded.department,unit='kg',block_test_profile_code=excluded.block_test_profile_code").bind(profile.inputSku, profile.name, profile.department, now, profile.code),
+    db.prepare("INSERT INTO products (sku,barcode,name,department,unit,cost_price,selling_price,quantity,imported_at,block_test_profile_code,active) VALUES (?,NULL,?,?, 'kg',0,0,0,?,?,1) ON CONFLICT(sku) DO UPDATE SET name=excluded.name,department=excluded.department,unit='kg',block_test_profile_code=excluded.block_test_profile_code,active=1").bind(profile.inputSku, profile.name, profile.department, now, profile.code),
     ...profile.items.map(item => db.prepare("INSERT OR IGNORE INTO products (sku,barcode,name,department,unit,cost_price,selling_price,quantity,imported_at) VALUES (?,NULL,?,?, 'kg',0,0,0,?)").bind(item.outputSku, item.name, profile.department, now)),
   ]));
   await db.prepare("UPDATE products SET target_margin_percent=CASE WHEN selling_price>cost_price AND selling_price>0 THEN ((selling_price-cost_price)/selling_price)*100 ELSE 30 END WHERE target_margin_percent<=0").run();
@@ -38,7 +39,7 @@ async function ensureSchema() {
 export async function GET() {
   await ensureSchema();
   const [products, suppliers, receipts, lines, allocations] = await Promise.all([
-    env.DB.prepare("SELECT id, sku, barcode, name, department, unit, cost_price AS costPrice, selling_price AS sellingPrice, quantity, block_test_profile_code AS blockTestProfileCode FROM products ORDER BY CASE WHEN block_test_profile_code IS NULL THEN 1 ELSE 0 END,name LIMIT 5000").all(),
+    env.DB.prepare("SELECT id, sku, barcode, name, department, unit, cost_price AS costPrice, selling_price AS sellingPrice, quantity, block_test_profile_code AS blockTestProfileCode FROM products WHERE active=1 ORDER BY CASE WHEN block_test_profile_code IS NULL THEN 1 ELSE 0 END,name LIMIT 5000").all(),
     env.DB.prepare("SELECT id, name, payment_terms_days AS paymentTermsDays, contact FROM suppliers WHERE active=1 ORDER BY name").all(),
     env.DB.prepare("SELECT id, receipt_number AS receiptNumber, supplier_name AS supplierName, invoice_number AS invoiceNumber, delivery_date AS deliveryDate, total_cost AS totalCost, created_at AS createdAt FROM stock_receipts ORDER BY id DESC LIMIT 50").all(),
     env.DB.prepare("SELECT id, receipt_id AS receiptId, product_name AS productName, department, quantity, unit, cost_price AS costPrice, line_total AS lineTotal FROM stock_receipt_lines WHERE receipt_id IN (SELECT id FROM stock_receipts ORDER BY id DESC LIMIT 50) ORDER BY id").all(),

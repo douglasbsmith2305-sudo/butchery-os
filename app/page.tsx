@@ -508,6 +508,10 @@ function StockMaster() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All departments");
   const [newDepartment, setNewDepartment] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
+  const [bulkAction, setBulkAction] = useState("");
+  const [targetDepartment, setTargetDepartment] = useState("");
+  const [bulkBusy, setBulkBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function loadStock() {
@@ -515,7 +519,7 @@ function StockMaster() {
       const response = await fetch("/api/stock"); const data = await response.json();
       if (!response.ok) throw new Error(data.error);
       setDepartments(data.departments.map((item: { name: string }) => item.name));
-      setProducts(data.products); setMessage(`${data.products.length} products in the stock master`);
+      setProducts(data.products); setSelectedIds(current => new Set([...current].filter(id => data.products.some((product: StockProduct) => product.id === id)))); setMessage(`${data.products.length} products in the stock master`);
     } catch { setMessage("Stock database is preparing. Refresh once the deployment is complete."); }
   }
   useEffect(() => { void loadStock(); }, []);
@@ -545,8 +549,30 @@ function StockMaster() {
     if (response.ok) { setNewDepartment(""); await loadStock(); setMessage(`${name} department created.`); }
   }
 
+  async function applyBulkAction() {
+    const productIds = [...selectedIds];
+    if (!productIds.length) { setMessage("Select one or more products first."); return; }
+    if (!bulkAction) { setMessage("Choose what to do with the selected products."); return; }
+    if (bulkAction === "bulk_assign" && !targetDepartment) { setMessage("Choose the destination department."); return; }
+    if (bulkAction === "bulk_delete" && !window.confirm(`Remove ${productIds.length} selected product${productIds.length === 1 ? "" : "s"} from active stock? Historical sales and stock records will be retained.`)) return;
+    setBulkBusy(true);
+    try {
+      const response = await fetch("/api/stock", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: bulkAction, productIds, department: targetDepartment }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Bulk action failed");
+      setSelectedIds(new Set()); setBulkAction(""); setTargetDepartment("");
+      await loadStock();
+      setMessage(bulkAction === "bulk_assign" ? `${productIds.length} product${productIds.length === 1 ? "" : "s"} assigned to ${targetDepartment}.` : `${productIds.length} product${productIds.length === 1 ? "" : "s"} removed from active stock.`);
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Bulk action failed"); }
+    finally { setBulkBusy(false); }
+  }
+
   const visible = products.filter((product) => (filter === "All departments" || product.department === filter) && `${product.sku} ${product.barcode} ${product.name}`.toLowerCase().includes(search.toLowerCase()));
   const shown = preview.length ? preview : visible;
+  const selectableIds = visible.flatMap(product => product.id ? [product.id] : []);
+  const allFilteredSelected = selectableIds.length > 0 && selectableIds.every(id => selectedIds.has(id));
+  function toggleProduct(id: number) { setSelectedIds(current => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; }); }
+  function toggleFiltered() { setSelectedIds(current => { const next = new Set(current); if (allFilteredSelected) selectableIds.forEach(id => next.delete(id)); else selectableIds.forEach(id => next.add(id)); return next; }); }
 
   return <div className="content stock-master">
     <div className="eyebrow">STOCK SYSTEM / MASTER DATA</div>
@@ -558,7 +584,8 @@ function StockMaster() {
     </div>
     <section className="panel stock-register"><div className="panel-head"><div><small>{preview.length ? "IMPORT PREVIEW" : "PRODUCT REGISTER"}</small><h2>{preview.length ? "Check department matching" : "All stock items"}</h2></div><span>{message}</span></div>
       <div className="stock-toolbar"><input placeholder="Search code, barcode or product…" value={search} onChange={(e) => setSearch(e.target.value)} /><select value={filter} onChange={(e) => setFilter(e.target.value)}><option>All departments</option>{departments.map((name) => <option key={name}>{name}</option>)}</select>{preview.length > 0 && <button onClick={() => setPreview([])}>Cancel preview</button>}</div>
-      <div className="product-table"><div className="product-row header"><span>STOCK CODE</span><span>PRODUCT</span><span>DEPARTMENT</span><span>UNIT</span><span>ON HAND</span><span>SELLING PRICE</span></div>{shown.slice(0, 200).map((product, index) => <div className={`product-row ${product.department === "Unmapped" ? "unmapped" : ""}`} key={`${product.sku}-${index}`}><b>{product.sku}</b><strong>{product.name}</strong><span>{product.department}</span><span>{product.unit}</span><span>{product.quantity}</span><span>{money(product.sellingPrice)}</span></div>)}{!shown.length && <div className="empty-stock">No products to show. Upload your current stock-list CSV to begin.</div>}</div>
+      {!preview.length && <div className="bulk-stock-toolbar"><label><input type="checkbox" checked={allFilteredSelected} onChange={toggleFiltered} /> Select all {visible.length} matching</label><strong>{selectedIds.size} selected</strong><select aria-label="What to do with selected products" value={bulkAction} onChange={event => setBulkAction(event.target.value)}><option value="">What to do…</option><option value="bulk_assign">Assign to department</option><option value="bulk_delete">Delete from active stock</option></select>{bulkAction === "bulk_assign" && <select aria-label="Destination department" value={targetDepartment} onChange={event => setTargetDepartment(event.target.value)}><option value="">Choose department…</option>{departments.filter(name => name !== "Unmapped").map(name => <option key={name}>{name}</option>)}</select>}<button className={bulkAction === "bulk_delete" ? "danger" : ""} disabled={!selectedIds.size || !bulkAction || bulkBusy || (bulkAction === "bulk_assign" && !targetDepartment)} onClick={applyBulkAction}>{bulkBusy ? "Applying…" : "Apply"}</button></div>}
+      <div className="product-table"><div className="product-row header selectable"><span>SELECT</span><span>STOCK CODE</span><span>PRODUCT</span><span>DEPARTMENT</span><span>UNIT</span><span>ON HAND</span><span>SELLING PRICE</span></div>{shown.slice(0, 200).map((product, index) => <div className={`product-row selectable ${product.department === "Unmapped" ? "unmapped" : ""} ${product.id && selectedIds.has(product.id) ? "selected" : ""}`} key={`${product.sku}-${index}`}><span>{product.id ? <input type="checkbox" aria-label={`Select ${product.name}`} checked={selectedIds.has(product.id)} onChange={() => toggleProduct(product.id!)} /> : "—"}</span><b>{product.sku}</b><strong>{product.name}</strong><span>{product.department}</span><span>{product.unit}</span><span>{product.quantity}</span><span>{money(product.sellingPrice)}</span></div>)}{!shown.length && <div className="empty-stock">No products to show. Upload your current stock-list CSV to begin.</div>}</div>
     </section>
   </div>;
 }
