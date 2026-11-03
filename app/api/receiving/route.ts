@@ -50,6 +50,10 @@ export async function GET() {
 
 type ReceiptLine = { productId?: number; quantity?: number; costPrice?: number };
 type ReceiptPayload = {
+  action?: "create_supplier";
+  supplierName?: string;
+  paymentTermsDays?: number;
+  contact?: string;
   supplierId?: number;
   invoiceNumber?: string;
   deliveryDate?: string;
@@ -58,7 +62,7 @@ type ReceiptPayload = {
   lines?: ReceiptLine[];
 };
 type ProductRow = { id: number; name: string; department: string; unit: string; quantity: number; costPrice: number; sellingPrice: number; targetMarginPercent: number; blockTestProfileCode:string|null };
-type SupplierRow = { id: number; name: string; paymentTermsDays: number };
+type SupplierRow = { id: number; name: string; paymentTermsDays: number; contact?: string|null };
 
 const inclusiveDueDate = (deliveryDate: string, days: number) => {
   const due = new Date(`${deliveryDate}T12:00:00Z`);
@@ -69,6 +73,23 @@ const inclusiveDueDate = (deliveryDate: string, days: number) => {
 export async function POST(request: Request) {
   await ensureSchema();
   const payload = await request.json() as ReceiptPayload;
+  if (payload.action === "create_supplier") {
+    const name = payload.supplierName?.trim() ?? "";
+    const paymentTermsDays = Number(payload.paymentTermsDays);
+    const contact = payload.contact?.trim() ?? "";
+    if (!name || name.length > 120) return Response.json({ error: "Enter a supplier name of 120 characters or fewer." }, { status: 400 });
+    if (!Number.isInteger(paymentTermsDays) || paymentTermsDays < 1 || paymentTermsDays > 365) return Response.json({ error: "Payment terms must be between 1 and 365 days." }, { status: 400 });
+    if (contact.length > 160) return Response.json({ error: "Contact details must be 160 characters or fewer." }, { status: 400 });
+
+    const existing = await env.DB.prepare("SELECT id FROM suppliers WHERE lower(name)=lower(?)").bind(name).first<{id:number}>();
+    if (existing) {
+      await env.DB.prepare("UPDATE suppliers SET name=?, payment_terms_days=?, contact=?, active=1 WHERE id=?").bind(name, paymentTermsDays, contact || null, existing.id).run();
+    } else {
+      await env.DB.prepare("INSERT INTO suppliers (name, payment_terms_days, contact, active) VALUES (?, ?, ?, 1)").bind(name, paymentTermsDays, contact || null).run();
+    }
+    const supplier = await env.DB.prepare("SELECT id, name, payment_terms_days AS paymentTermsDays, contact FROM suppliers WHERE lower(name)=lower(?)").bind(name).first<SupplierRow>();
+    return Response.json({ ok: true, supplier });
+  }
   const invoiceNumber = payload.invoiceNumber?.trim() ?? "";
   const deliveryDate = payload.deliveryDate?.trim() ?? "";
   const suppliedLines = payload.lines ?? [];

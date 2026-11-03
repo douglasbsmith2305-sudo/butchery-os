@@ -17,6 +17,9 @@ test("universal receiving supports searchable mixed-unit stock intake", async ()
   assert.match(page, /Receive all products/);
   assert.match(page, /\["Pork", \["pork", "vark", "varkvleis"/);
   assert.match(page, /Add the invoice value to supplier accounts and payment calendar/);
+  assert.match(page, /\+ New supplier/);
+  assert.match(page, /Payment terms \(days\)/);
+  assert.match(page, /action:"create_supplier"/);
   assert.match(page, /supplier cost per \$\{selected\.unit\}/i);
   assert.match(page, /sent to Back Office approval/i);
   assert.match(styles, /\.receiving-layout/);
@@ -37,6 +40,9 @@ test("receiving persists stock, cost, supplier invoices and ledger movements", a
   assert.match(route, /inclusiveDueDate/);
   assert.match(route, /RECEIVING_AUTO_INCREASE/);
   assert.match(route, /price_decrease_approvals/);
+  assert.match(route, /payload\.action === "create_supplier"/);
+  assert.match(route, /INSERT INTO suppliers \(name, payment_terms_days, contact, active\)/);
+  assert.match(route, /UPDATE suppliers SET name=\?, payment_terms_days=\?, contact=\?, active=1/);
   assert.match(database, /"stock_receipts"/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS stock_receipts/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS stock_ledger_entries/);
