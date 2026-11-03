@@ -51,7 +51,7 @@ export async function GET(request:Request) {
   if(deviceId&&(format==="csv"||format==="json")){
     const device=await env.DB.prepare("SELECT id,name,brand,connector_type AS connectorType,location,endpoint,database_table AS databaseTable,last_sync_at AS lastSyncAt,last_sync_status AS lastSyncStatus FROM scale_devices WHERE id=? AND active=1").bind(deviceId).first<Record<string,unknown>>();
     if(!device)return Response.json({error:"Scale not found"},{status:404});
-    const [mappings,staffRows]=await Promise.all([env.DB.prepare(`${productSelect} WHERE m.device_id=? AND m.enabled=1 ORDER BY CAST(m.plu AS INTEGER),p.name`).bind(deviceId).all<Record<string,unknown>>(),env.DB.prepare("SELECT c.id,c.staff_code AS staffCode,e.full_name AS fullName,e.employee_number AS employeeNumber FROM commission_staff c JOIN payroll_employees e ON e.id=c.employee_id WHERE c.active=1 ORDER BY CAST(c.staff_code AS INTEGER)").all<CommissionStaff>()]);
+    const [mappings,staffRows]=await Promise.all([env.DB.prepare(`${productSelect} WHERE m.device_id=? AND m.enabled=1 ORDER BY m.plu,p.name`).bind(deviceId).all<Record<string,unknown>>(),env.DB.prepare("SELECT c.id,c.staff_code AS staffCode,e.full_name AS fullName,e.employee_number AS employeeNumber FROM commission_staff c JOIN payroll_employees e ON e.id=c.employee_id WHERE c.active=1 ORDER BY CAST(c.staff_code AS INTEGER)").all<CommissionStaff>()]);
     const scaleItems=expandedItems(mappings.results,staffRows.results);
     if(format==="csv"){
       const headers=["PLU","SKU","BarcodePrefix","LabelName","Department","Unit","PricePerKg","StaffCode","StaffName"];
@@ -66,7 +66,7 @@ export async function GET(request:Request) {
   for(const device of activeDevices.results)await ensureMappings(device.id);
   const [devices,mappings,jobs]=await Promise.all([
     env.DB.prepare("SELECT id,name,brand,connector_type AS connectorType,location,endpoint,database_table AS databaseTable,scale_group AS scaleGroup,active,last_sync_at AS lastSyncAt,last_sync_status AS lastSyncStatus,last_heartbeat_at AS lastHeartbeatAt,created_at AS createdAt FROM scale_devices ORDER BY name").all(),
-    env.DB.prepare(`${productSelect} ORDER BY m.device_id,CAST(m.plu AS INTEGER),p.name`).all(),
+    env.DB.prepare(`${productSelect} ORDER BY m.device_id,m.plu,p.name`).all(),
     env.DB.prepare("SELECT j.id,j.device_id AS deviceId,d.name AS deviceName,j.status,j.source,j.item_count AS itemCount,j.created_at AS createdAt,j.completed_at AS completedAt,j.error FROM scale_sync_jobs j JOIN scale_devices d ON d.id=j.device_id ORDER BY j.id DESC LIMIT 100").all(),
   ]);
   return Response.json({devices:devices.results,mappings:mappings.results,jobs:jobs.results});
