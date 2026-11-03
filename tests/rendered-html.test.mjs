@@ -132,6 +132,47 @@ test("staff commission is editable, VAT-exclusive and attributed through scale P
   assert.match(sandbox, /function SandboxCommission/);
 });
 
+test("earned staff commission flows into payroll, PAYE, net pay and payslips", async () => {
+  const [page, payroll, migration] = await Promise.all([
+    projectFile("app/page.tsx"),
+    projectFile("app/api/payroll/route.ts"),
+    projectFile("drizzle/0016_payroll_commission.sql"),
+  ]);
+
+  assert.match(page, /Commission earned/);
+  assert.match(page, /Sales commission ·/);
+  assert.match(page, /commissionPay/);
+  assert.match(payroll, /commission_pay AS commissionPay/);
+  assert.match(payroll, /entry_type='EARNED'/);
+  assert.match(payroll, /gross=employee\.baseSalary\+overtimePay\+commissionPay/);
+  assert.match(payroll, /net=Math\.max\(0,employee\.baseSalary\+overtimePay\+commissionPay-totalDeductions\)/);
+  assert.match(payroll, /\["Sales commission",run\.commissionPay\]/);
+  assert.match(migration, /commission_pay/);
+});
+
+test("production header uses the live Johannesburg date and shift", async () => {
+  const page = await projectFile("app/page.tsx");
+  assert.match(page, /timeZone: "Africa\/Johannesburg"/);
+  assert.match(page, /AFTERNOON SHIFT/);
+  assert.doesNotMatch(page, /WED 12 AUG · MORNING SHIFT/);
+});
+
+test("stock imports preserve source VAT and scale PLU codes", async () => {
+  const [page, stock, migration] = await Promise.all([
+    projectFile("app/page.tsx"),
+    projectFile("app/api/stock/route.ts"),
+    projectFile("drizzle/0017_stock_report_plu_import.sql"),
+  ]);
+
+  assert.match(page, /plu:value\(cells,indexes\.plu\)/);
+  assert.match(page, /vatPercent/);
+  assert.match(stock, /vat_percent AS vatPercent/);
+  assert.match(stock, /scale_product_mappings/);
+  assert.match(stock, /p\.sku=\?/);
+  assert.match(stock, /row\.plu!\.trim\(\)/);
+  assert.match(migration, /vat_percent/);
+});
+
 test("manager can access the shared accounts and calendar workspace", async () => {
   const page = await projectFile("app/page.tsx");
 
