@@ -17,6 +17,7 @@ html:root {
   color-scheme: light;
 }
 html:root.dark-theme {
+  color-scheme: dark;
   --bg: #101216;
   --panel: #191c22;
   --panel2: #20242c;
