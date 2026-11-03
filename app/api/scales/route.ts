@@ -24,10 +24,17 @@ const productSelect="SELECT m.id,m.device_id AS deviceId,m.product_id AS product
 
 async function ensureMappings(deviceId:number) {
   const now=new Date().toISOString();
-  const products=await env.DB.prepare("SELECT id,name FROM products WHERE LOWER(unit)='kg' ORDER BY id").all<{id:number;name:string}>();
-  await env.DB.batch(products.results.map(product=>env.DB.prepare("INSERT INTO scale_product_mappings (device_id,product_id,plu,barcode_prefix,label_name,enabled,updated_at) VALUES (?,?,?,?,?,1,?) ON CONFLICT(device_id,product_id) DO UPDATE SET label_name=excluded.label_name,updated_at=excluded.updated_at").bind(deviceId,product.id,String(1000+product.id),"20",product.name.slice(0,30),now)));
+  await env.DB.prepare(`
+    INSERT INTO scale_product_mappings (device_id,product_id,plu,barcode_prefix,label_name,enabled,updated_at)
+    SELECT ?,p.id,CAST(1000+p.id AS TEXT),'20',SUBSTR(p.name,1,30),1,?
+    FROM products p
+    WHERE LOWER(p.unit)='kg'
+      AND NOT EXISTS (SELECT 1 FROM scale_product_mappings current WHERE current.device_id=? AND current.product_id=p.id)
+      AND NOT EXISTS (SELECT 1 FROM scale_product_mappings occupied WHERE occupied.device_id=? AND occupied.plu=CAST(1000+p.id AS TEXT))
+  `).bind(deviceId,now,deviceId,deviceId).run();
+  const products=await env.DB.prepare("SELECT COUNT(*) AS count FROM products WHERE LOWER(unit)='kg'").first<{count:number}>();
   const staff=await env.DB.prepare("SELECT COUNT(*) AS count FROM commission_staff WHERE active=1").first<{count:number}>();
-  return products.results.length*(Number(staff?.count??0)+1);
+  return Number(products?.count??0)*(Number(staff?.count??0)+1);
 }
 
 function csvCell(value:unknown){const text=String(value??"");return /[",\n]/.test(text)?`"${text.replace(/"/g,'""')}"`:text;}
