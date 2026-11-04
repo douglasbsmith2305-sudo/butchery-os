@@ -8,6 +8,7 @@ async function ensureSchema() {
     env.DB.prepare("ALTER TABLE butcher_orders ADD COLUMN IF NOT EXISTS destination TEXT NOT NULL DEFAULT 'BUTCHER'"),
     env.DB.prepare("ALTER TABLE butcher_orders ADD COLUMN IF NOT EXISTS fulfillment_type TEXT NOT NULL DEFAULT 'PICKUP'"),
     env.DB.prepare("ALTER TABLE butcher_orders ADD COLUMN IF NOT EXISTS delivery_address TEXT"),
+    env.DB.prepare("ALTER TABLE butcher_orders ADD COLUMN IF NOT EXISTS requested_date TEXT"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS butcher_order_items (id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER NOT NULL, product_id INTEGER NOT NULL, product_name TEXT NOT NULL, quantity REAL NOT NULL, unit TEXT NOT NULL, unit_price REAL NOT NULL, line_total REAL NOT NULL, FOREIGN KEY(order_id) REFERENCES butcher_orders(id))"),
     env.DB.prepare("CREATE INDEX IF NOT EXISTS butcher_orders_status_idx ON butcher_orders(status,created_at)"),
   ]);
@@ -16,7 +17,7 @@ async function ensureSchema() {
 export async function GET() {
   await ensureSchema();
   const [orders, items] = await Promise.all([
-    env.DB.prepare("SELECT id,order_number AS orderNumber,customer_name AS customerName,customer_contact AS customerContact,requested_time AS requestedTime,notes,status,total,source,destination,fulfillment_type AS fulfillmentType,delivery_address AS deliveryAddress,created_at AS createdAt,updated_at AS updatedAt FROM butcher_orders ORDER BY CASE status WHEN 'QUEUED' THEN 1 WHEN 'IN_PROGRESS' THEN 2 WHEN 'READY' THEN 3 ELSE 4 END,id DESC LIMIT 200").all(),
+    env.DB.prepare("SELECT id,order_number AS orderNumber,customer_name AS customerName,customer_contact AS customerContact,requested_time AS requestedTime,requested_date AS requestedDate,notes,status,total,source,destination,fulfillment_type AS fulfillmentType,delivery_address AS deliveryAddress,created_at AS createdAt,updated_at AS updatedAt FROM butcher_orders ORDER BY CASE status WHEN 'QUEUED' THEN 1 WHEN 'IN_PROGRESS' THEN 2 WHEN 'READY' THEN 3 ELSE 4 END,requested_date ASC NULLS LAST,requested_time ASC,id DESC LIMIT 200").all(),
     env.DB.prepare("SELECT id,order_id AS orderId,product_id AS productId,product_name AS productName,quantity,unit,unit_price AS unitPrice,line_total AS lineTotal FROM butcher_order_items ORDER BY id").all(),
   ]);
   return Response.json({ orders: orders.results, items: items.results });
@@ -24,9 +25,11 @@ export async function GET() {
 
 export async function POST(request: Request) {
   await ensureSchema();
-  const payload = await request.json() as { action?: string; customerName?: string; customerContact?: string; requestedTime?: string; notes?: string; lines?: OrderLine[]; orderId?: number; status?: string; source?: string; destination?:string; fulfillmentType?: string; deliveryAddress?: string };
+  const payload = await request.json() as { action?: string; customerName?: string; customerContact?: string; requestedTime?: string; requestedDate?: string; notes?: string; lines?: OrderLine[]; orderId?: number; status?: string; source?: string; destination?:string; fulfillmentType?: string; deliveryAddress?: string };
   const now = new Date().toISOString();
   if (payload.action === "create") {
+    const requestedDate=payload.requestedDate?.trim()||null;
+    if(requestedDate&&(!/^\d{4}-\d{2}-\d{2}$/.test(requestedDate)||!Number.isFinite(Date.parse(`${requestedDate}T12:00:00Z`))||new Date(`${requestedDate}T12:00:00Z`).toISOString().slice(0,10)!==requestedDate))return Response.json({error:"Choose a valid completion date."},{status:400});
     const fulfillmentType=payload.fulfillmentType??"PICKUP";
     if(!["PICKUP","DELIVERY"].includes(fulfillmentType))return Response.json({error:"Choose pickup or delivery."},{status:400});
     const deliveryAddress=fulfillmentType==="DELIVERY"?String(payload.deliveryAddress??"").trim():null;
@@ -34,9 +37,9 @@ export async function POST(request: Request) {
     const lines = (payload.lines ?? []).filter(line => line.productId && line.quantity > 0); if (!payload.customerName?.trim() || !lines.length) return Response.json({ error: "Customer name and at least one order item are required" }, { status: 400 });
     const destinations=["BUTCHER","TAKEAWAYS","BAKERY"]; const destination=destinations.includes(payload.destination??"")?payload.destination!:"BUTCHER"; const prefix=destination==="TAKEAWAYS"?"TAK":destination==="BAKERY"?"BAK":"BCH"; const orderNumber = `${prefix}-${Date.now().toString().slice(-8)}`; const total = lines.reduce((sum,line)=>sum+line.quantity*line.unitPrice,0);
     const source = payload.source === "ONLINE" ? "ONLINE" : "POS";
-    const result = await env.DB.prepare("INSERT INTO butcher_orders (order_number,customer_name,customer_contact,requested_time,notes,status,total,source,destination,fulfillment_type,delivery_address,created_at,updated_at) VALUES (?,?,?,?,?,'QUEUED',?,?,?,?,?,?,?)").bind(orderNumber,payload.customerName.trim(),payload.customerContact?.trim()||"",payload.requestedTime||"",payload.notes?.trim()||"",total,source,destination,fulfillmentType,deliveryAddress,now,now).run(); const orderId=Number(result.meta.last_row_id);
+    const result = await env.DB.prepare("INSERT INTO butcher_orders (order_number,customer_name,customer_contact,requested_time,requested_date,notes,status,total,source,destination,fulfillment_type,delivery_address,created_at,updated_at) VALUES (?,?,?,?,?,?,'QUEUED',?,?,?,?,?,?,?)").bind(orderNumber,payload.customerName.trim(),payload.customerContact?.trim()||"",payload.requestedTime||"",requestedDate,payload.notes?.trim()||"",total,source,destination,fulfillmentType,deliveryAddress,now,now).run(); const orderId=Number(result.meta.last_row_id);
     await env.DB.batch(lines.map(line=>env.DB.prepare("INSERT INTO butcher_order_items (order_id,product_id,product_name,quantity,unit,unit_price,line_total) VALUES (?,?,?,?,?,?,?)").bind(orderId,line.productId,line.name,line.quantity,line.unit,line.unitPrice,line.quantity*line.unitPrice)));
-    return Response.json({ ok:true,orderNumber,destination,fulfillmentType,deliveryAddress });
+    return Response.json({ ok:true,orderNumber,destination,fulfillmentType,deliveryAddress,requestedDate });
   }
   if (payload.action === "status") {
     const allowed=["QUEUED","IN_PROGRESS","READY","COLLECTED","CANCELLED"]; if (!payload.orderId || !allowed.includes(payload.status??"")) return Response.json({error:"Valid order and status required"},{status:400});
