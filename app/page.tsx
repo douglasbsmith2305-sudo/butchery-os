@@ -3,11 +3,11 @@
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { BLOCK_TEST_PROFILES, blockTestProfile } from "@/lib/block-tests";
 import SandboxWorkspace from "@/app/components/SandboxWorkspace";
+import { ManagerOverview, LiveBatchTracking, LiveCoolerInventory } from "@/app/components/LiveInventoryViews";
 import CostsWorkspace from "@/app/components/CostsWorkspace";
 import { PRODUCTION_DEPARTMENT } from "@/lib/cost-calculations";
 
-type Yield = { name: string; percent: number; price: number };
-type Batch = { id: string; supplier: string; type: string; weight: number; date: string };
+
 type StockProduct = { id?: number; sku: string; barcode: string; plu?:string; name: string; department: string; unit: string; costPrice: number; sellingPrice: number; quantity: number; vatPercent?:number; blockTestProfileCode?:string|null };
 type Supplier = { id: number; name: string; paymentTermsDays: number; contact: string };
 type SupplierInvoice = { id: number; invoiceNumber: string; supplierId: number; supplierName: string; deliveryDate: string; dueDate: string; amount: number; balance: number; status: string; paymentTermsDays: number };
@@ -22,39 +22,7 @@ type StockReceipt = { id:number;receiptNumber:string;supplierName:string;invoice
 type StockReceiptLine = { id:number;receiptId:number;productName:string;department:string;quantity:number;unit:string;costPrice:number;lineTotal:number };
 type ReceivingLine = { productId:number;sku:string;name:string;department:string;unit:string;quantity:number;costPrice:number;blockTestProfileCode?:string|null };
 
-const TOLERANCE = 0.02;
 
-const PROFILES: Record<string, Yield[]> = {
-  "Beef hind quarter": [
-    { name: "Rump", percent: 4, price: 169.99 },
-    { name: "Topside", percent: 11, price: 139.99 },
-    { name: "Silverside", percent: 10, price: 134.99 },
-    { name: "Thick flank", percent: 9, price: 129.99 },
-    { name: "Striploin", percent: 7, price: 184.99 },
-    { name: "Fillet", percent: 2, price: 269.99 },
-    { name: "Shin", percent: 6, price: 99.99 },
-    { name: "Stew beef", percent: 12, price: 119.99 },
-    { name: "Mince / trim", percent: 15, price: 109.99 },
-    { name: "Bone", percent: 18, price: 24.99 },
-    { name: "Fat / expected loss", percent: 6, price: 0 },
-  ],
-  "Beef fore quarter": [
-    { name: "Chuck", percent: 14, price: 124.99 },
-    { name: "Brisket", percent: 9, price: 139.99 },
-    { name: "Short rib", percent: 10, price: 129.99 },
-    { name: "Blade", percent: 8, price: 129.99 },
-    { name: "Shin", percent: 7, price: 99.99 },
-    { name: "Stew beef", percent: 13, price: 119.99 },
-    { name: "Mince / trim", percent: 16, price: 109.99 },
-    { name: "Bone", percent: 17, price: 24.99 },
-    { name: "Fat / expected loss", percent: 6, price: 0 },
-  ],
-};
-
-const seedBatches: Batch[] = [
-  { id: "HQ-260812-002", supplier: "Karoo Prime Meats", type: "Beef hind quarter", weight: 186.4, date: "Today, 07:42" },
-  { id: "FQ-260811-006", supplier: "Highveld Beef Co.", type: "Beef fore quarter", weight: 204.8, date: "Yesterday, 14:18" },
-];
 
 const kg = (value: number, digits = 2) => `${value.toLocaleString("en-ZA", { maximumFractionDigits: digits, minimumFractionDigits: digits })} kg`;
 const money = (value: number) => value.toLocaleString("en-ZA", { style: "currency", currency: "ZAR", maximumFractionDigits: 2 });
@@ -85,12 +53,7 @@ export default function Home() {
   const [portal, setPortal] = useState("Manager");
   const [section, setSection] = useState("Manager overview");
   const [theme, setTheme] = useState<"light" | "dark">("light");
-  const [supplier, setSupplier] = useState("Karoo Prime Meats");
-  const [profile, setProfile] = useState("Beef hind quarter");
-  const [weight, setWeight] = useState(100);
-  const [invoice, setInvoice] = useState("KPM-68142");
-  const [batches, setBatches] = useState(seedBatches);
-  const [notice, setNotice] = useState("");
+
   const [shiftLabel, setShiftLabel] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -134,24 +97,7 @@ export default function Home() {
     setTheme(next);
   }
 
-  const estimates = useMemo(() => PROFILES[profile].map((item) => {
-    const expected = weight * item.percent / 100;
-    return { ...item, expected, low: expected * (1 - TOLERANCE), high: expected * (1 + TOLERANCE) };
-  }), [profile, weight]);
 
-  const retailValue = estimates.reduce((sum, item) => sum + item.expected * item.price, 0);
-  const yieldTotal = PROFILES[profile].reduce((sum, item) => sum + item.percent, 0);
-
-  function receiveDelivery() {
-    if (!invoice.trim() || weight <= 0) {
-      setNotice("Enter a valid invoice number and scale weight.");
-      return;
-    }
-    const prefix = profile.includes("hind") ? "HQ" : "FQ";
-    const id = `${prefix}-260812-${String(batches.length + 3).padStart(3, "0")}`;
-    setBatches([{ id, supplier, type: profile, weight, date: "Just now" }, ...batches]);
-    setNotice(`${id} received. ${kg(weight)} was allocated automatically using the ${profile.toLowerCase()} yield model.`);
-  }
 
   return (
     <div className={`app-shell${menuOpen ? " menu-open" : ""}`}>
@@ -177,53 +123,7 @@ export default function Home() {
           <button className="theme-toggle" type="button" role="switch" aria-checked={theme === "dark"} aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`} onClick={toggleTheme}><span aria-hidden="true">{theme === "light" ? "☼" : "☾"}</span><b>{theme === "light" ? "LIGHT" : "DARK"}</b><i aria-hidden="true" /></button>
         </header>
 
-        {section === "Costs" ? <CostsWorkspace sandbox={portal === "Sandbox"} /> : portal === "Sandbox" ? <SandboxWorkspace section={section} /> : section === "Manager overview" ? <OperationsOverview batches={batches} onNavigate={setSection} /> : section === "Receiving" ? <UniversalReceiving /> : section === "Owner overview" ? <OwnerOverview onNavigate={setSection} onOpenPortal={(target) => { setPortal(target); setSection(target === "Manager" ? "Manager overview" : target === "Cashier" ? "POS" : "Orders"); }} /> : section === "Pricing" ? <PricingEngine /> : section === "Scale network" ? <ScaleNetwork /> : section === "Batch tracking" ? <BatchTracking batches={batches} /> : section === "Cooler inventory" ? <CoolerInventory estimates={estimates} /> : section === "Orders" ? <ButcherOrders /> : section === "Stock master" ? <StockMaster /> : section === "Stock count" ? <StockCount /> : section === "Waste & loss" ? <WasteLoss /> : section === "Payroll" ? <Payroll /> : section === "Commission" ? <CommissionControl /> : section === "Reports" ? <ManagementReports /> : section === "Settings" ? <BusinessSettings /> : section === "POS" ? <StandardPOS /> : section === "Accounts & Calendar" ? <FinancialControl initialTab="Accounts overview" /> : <div className="content">
-          <div className="eyebrow">COOLER / RECEIVING</div>
-          <div className="page-heading">
-            <div><h1>Receive meat. Know what you have.</h1><p>One scale weight creates estimated cut inventory automatically. No manual block test required.</p></div>
-            <span className="status-pill">AUTO-YIELD ACTIVE</span>
-          </div>
-
-          <section className="stat-grid" aria-label="Stock summary">
-            <article><small>RAW RECEIVED TODAY</small><strong>{kg(286.4, 1)}</strong><em>2 supplier lots</em></article>
-            <article><small>ESTIMATED SALEABLE</small><strong>{kg(217.2, 1)}</strong><em>75.8% of received weight</em></article>
-            <article><small>PROJECTED RETAIL VALUE</small><strong>{money(32184.70)}</strong><em>At current shelf prices</em></article>
-            <article><small>CONTROL TOLERANCE</small><strong className="amber">± 2%</strong><em>Applied to every cut estimate</em></article>
-          </section>
-
-          <div className="workspace-grid">
-            <section className="panel receive-panel">
-              <div className="panel-head"><div><small>STEP 01</small><h2>Supplier delivery</h2></div><span>Scale weight is the stock source</span></div>
-              <div className="form-grid">
-                <label>Supplier<select value={supplier} onChange={(e) => setSupplier(e.target.value)}><option>Karoo Prime Meats</option><option>Highveld Beef Co.</option><option>Lowveld Livestock</option></select></label>
-                <label>Supplier invoice<input value={invoice} onChange={(e) => setInvoice(e.target.value)} /></label>
-                <label>Meat received<select value={profile} onChange={(e) => setProfile(e.target.value)}>{Object.keys(PROFILES).map((name) => <option key={name}>{name}</option>)}</select></label>
-                <label>Delivery date<input type="date" defaultValue="2026-08-12" /></label>
-                <label className="weight-field">Actual scale weight <span>PRIMARY STOCK QUANTITY</span><div><input type="number" min="0.01" step="0.1" value={weight} onChange={(e) => setWeight(Number(e.target.value))} /><b>kg</b></div></label>
-              </div>
-              <div className="logic-note"><span>✓</span><div><strong>Automatic allocation</strong><p>{kg(weight)} is distributed using the {profile.toLowerCase()} baseline. The system accepts normal movement within 2% of each calculated cut.</p></div></div>
-              {notice && <div className="notice" role="status">{notice}</div>}
-              <button className="primary-action" onClick={receiveDelivery}>Receive & allocate stock <span>→</span></button>
-            </section>
-
-            <section className="panel yield-panel">
-              <div className="panel-head"><div><small>STEP 02 · AUTOMATIC</small><h2>Expected cooler stock</h2></div><span>{yieldTotal}% mass allocated</span></div>
-              <div className="example-callout"><div><small>YOUR EXAMPLE</small><strong>100 kg hind quarter → 4.00 kg rump</strong></div><div><small>2% RANGE</small><strong>3.92–4.08 kg</strong></div></div>
-              <div className="yield-table" role="table" aria-label="Automatic yield estimate">
-                <div className="yield-row header" role="row"><span>CUT</span><span>BASE</span><span>EXPECTED</span><span>ACCEPTABLE RANGE</span></div>
-                {estimates.map((item) => <div className="yield-row" role="row" key={item.name}><strong>{item.name}</strong><span>{item.percent.toFixed(1)}%</span><b>{kg(item.expected)}</b><span>{kg(item.low)} – {kg(item.high)}</span></div>)}
-              </div>
-              <footer><span>Projected retail value</span><strong>{money(retailValue)}</strong></footer>
-            </section>
-          </div>
-
-          <section className="panel recent-panel">
-            <div className="panel-head"><div><small>TRACEABILITY</small><h2>Recent automatic allocations</h2></div><button>View cooler inventory →</button></div>
-            <div className="batch-table">
-              {batches.slice(0, 3).map((batch) => <article key={batch.id}><span className="batch-icon">KG</span><div><strong>{batch.id}</strong><small>{batch.supplier}</small></div><div><small>MEAT TYPE</small><b>{batch.type}</b></div><div><small>SCALE WEIGHT</small><b>{kg(batch.weight, 1)}</b></div><div><small>ALLOCATION</small><b className="green">Automatic ±2%</b></div><time>{batch.date}</time></article>)}
-            </div>
-          </section>
-        </div>}
+        {section === "Costs" ? <CostsWorkspace sandbox={portal === "Sandbox"} /> : portal === "Sandbox" ? <SandboxWorkspace section={section} /> : section === "Manager overview" ? <ManagerOverview onNavigate={setSection} /> : section === "Receiving" ? <UniversalReceiving /> : section === "Owner overview" ? <OwnerOverview onNavigate={setSection} onOpenPortal={(target) => { setPortal(target); setSection(target === "Manager" ? "Manager overview" : target === "Cashier" ? "POS" : "Orders"); }} /> : section === "Pricing" ? <PricingEngine /> : section === "Scale network" ? <ScaleNetwork /> : section === "Batch tracking" ? <LiveBatchTracking /> : section === "Cooler inventory" ? <LiveCoolerInventory /> : section === "Orders" ? <ButcherOrders /> : section === "Stock master" ? <StockMaster /> : section === "Stock count" ? <StockCount /> : section === "Waste & loss" ? <WasteLoss /> : section === "Payroll" ? <Payroll /> : section === "Commission" ? <CommissionControl /> : section === "Reports" ? <ManagementReports /> : section === "Settings" ? <BusinessSettings /> : section === "POS" ? <StandardPOS /> : section === "Accounts & Calendar" ? <FinancialControl initialTab="Accounts overview" /> : <div className="content"><h1>Select a workspace section.</h1></div>}
       </main>
     </div>
   );
@@ -256,31 +156,7 @@ function UniversalReceiving() {
   </div>;
 }
 
-function OperationsOverview({ batches, onNavigate }: { batches: Batch[]; onNavigate: (section: string) => void }) {
-  const received = batches.reduce((sum, batch) => sum + batch.weight, 0);
-  const actions = [["Receiving", "Receive stock", "Capture a supplier delivery"], ["Orders", "Butcher orders", "Monitor orders sent from the POS"], ["Stock count", "Count stock", "Reconcile physical stock to the ledger"], ["Waste & loss", "Record waste", "Deduct and explain every lost kilogram"]];
-  return <div className="content"><div className="eyebrow">GEORGE&apos;S BUTCHERY / OVERVIEW</div><div className="page-heading"><div><h1>What needs doing?</h1><p>Your live operational view from supplier delivery through the customer counter.</p></div><span className="status-pill">ALL SYSTEMS ONLINE</span></div>
-    <section className="stat-grid"><article><small>RAW BATCHES</small><strong>{batches.length}</strong><em>{kg(received, 1)} traceable stock</em></article><article><small>COOLER STOCK</small><strong>{kg(received * .758, 1)}</strong><em>Estimated saleable quantity</em></article><article><small>OPEN BUTCHER ORDERS</small><strong>1</strong><em>Awaiting payment at POS</em></article><article><small>CONTROL STATUS</small><strong className="green">Balanced</strong><em>Automatic yield tolerance ±2%</em></article></section>
-    <section className="overview-actions">{actions.map(([target, title, copy]) => <button key={target} onClick={() => onNavigate(target)}><small>OPEN MODULE</small><strong>{title}</strong><span>{copy}</span><b>→</b></button>)}</section>
-    <section className="panel recent-panel"><div className="panel-head"><div><small>TRACEABILITY</small><h2>Latest batches</h2></div><button onClick={() => onNavigate("Batch tracking")}>See batch register →</button></div><div className="batch-table">{batches.map(batch => <article key={batch.id}><span className="batch-icon">KG</span><div><strong>{batch.id}</strong><small>{batch.supplier}</small></div><div><small>TYPE</small><b>{batch.type}</b></div><div><small>RECEIVED</small><b>{kg(batch.weight, 1)}</b></div><div><small>STATUS</small><b className="green">Allocated</b></div><time>{batch.date}</time></article>)}</div></section>
-  </div>;
-}
 
-function BatchTracking({ batches }: { batches: Batch[] }) {
-  const [selected, setSelected] = useState(batches[0]?.id ?? ""); const batch = batches.find(b => b.id === selected) ?? batches[0];
-  return <div className="content"><div className="eyebrow">COOLER / BATCH TRACEABILITY</div><div className="page-heading"><div><h1>Every delivery. Every kilogram.</h1><p>Trace supplier stock from receipt through automatic yield allocation and sale.</p></div><span className="status-pill">{batches.length} ACTIVE BATCHES</span></div><div className="batch-layout"><section className="panel batch-register"><div className="panel-head"><div><small>BATCH REGISTER</small><h2>Supplier deliveries</h2></div></div>{batches.map(item => <button key={item.id} className={selected === item.id ? "active" : ""} onClick={() => setSelected(item.id)}><span className="batch-icon">KG</span><div><strong>{item.id}</strong><small>{item.supplier}</small></div><b>{kg(item.weight, 1)}</b></button>)}</section>{batch && <section className="panel batch-detail"><div className="panel-head"><div><small>FULL TRACE</small><h2>{batch.id}</h2></div><span>ALLOCATED</span></div><div className="batch-facts"><div><small>SUPPLIER</small><strong>{batch.supplier}</strong></div><div><small>MEAT TYPE</small><strong>{batch.type}</strong></div><div><small>SCALE WEIGHT</small><strong>{kg(batch.weight, 1)}</strong></div><div><small>RECEIVED</small><strong>{batch.date}</strong></div></div><div className="trace-line"><span className="done">1<strong>Received</strong><small>{kg(batch.weight, 1)}</small></span><i /><span className="done">2<strong>Auto allocated</strong><small>Baseline ±2%</small></span><i /><span>3<strong>Butcher booking</strong><small>Tracked by ticket</small></span><i /><span>4<strong>POS sale</strong><small>Revenue reconciled</small></span></div></section>}</div></div>;
-}
-
-function CoolerInventory({ estimates }: { estimates: Array<Yield & { expected: number; low: number; high: number }> }) {
-  return <div className="content"><div className="eyebrow">COOLER / LIVE INVENTORY</div><div className="page-heading"><div><h1>Available cooler stock.</h1><p>Expected physical stock created from received batches, with the built-in 2% control range.</p></div><span className="status-pill">{estimates.length} PRODUCTS</span></div><section className="panel"><div className="inventory-row header"><span>PRODUCT</span><span>PHYSICAL KG</span><span>RESERVED</span><span>AVAILABLE</span><span>CONTROL RANGE</span><span>STATUS</span></div>{estimates.map((item, index) => { const reserved = index < 3 ? [2.3, 3.1, 1.5][index] : 0; return <div className="inventory-row" key={item.name}><strong>{item.name}</strong><b>{kg(item.expected)}</b><span>{kg(reserved)}</span><b>{kg(Math.max(0, item.expected - reserved))}</b><span>{kg(item.low)}–{kg(item.high)}</span><em>IN RANGE</em></div>; })}</section></div>;
-}
-
-function ButcherCounter({ estimates }: { estimates: Array<Yield & { expected: number }> }) {
-  const [product, setProduct] = useState(estimates[0]?.name ?? "Rump"); const [ticketWeight, setTicketWeight] = useState(1); const [items, setItems] = useState<Array<{ name: string; weight: number; price: number }>>([]);
-  const selected = estimates.find(item => item.name === product) ?? estimates[0]; const total = items.reduce((sum, item) => sum + item.weight * item.price, 0);
-  function addItem() { if (!selected || ticketWeight <= 0 || ticketWeight > selected.expected) return; setItems([...items, { name: selected.name, weight: ticketWeight, price: selected.price }]); }
-  return <div className="content"><div className="eyebrow">BUTCHER COUNTER / NEW TICKET</div><div className="page-heading"><div><h1>Weigh and reserve the order.</h1><p>Meat moves from available cooler stock to reserved stock until the customer pays.</p></div><span className="status-pill">BT-{10482 + items.length}</span></div><div className="finance-columns"><section className="panel finance-form"><div className="panel-head"><div><small>ADD MEAT</small><h2>Customer order</h2></div></div><div className="finance-form-body"><label className="wide">Product<select value={product} onChange={e => setProduct(e.target.value)}>{estimates.filter(i => i.price > 0).map(i => <option key={i.name}>{i.name}</option>)}</select></label><label>Weight (kg)<input type="number" min="0.01" step="0.01" value={ticketWeight} onChange={e => setTicketWeight(Number(e.target.value))} /></label><label>Price / kg<input value={money(selected?.price ?? 0)} readOnly /></label><button className="primary-action" onClick={addItem}>Add to ticket <span>→</span></button></div></section><section className="panel ticket-panel"><div className="panel-head"><div><small>AWAITING PAYMENT</small><h2>Butcher ticket</h2></div><span>{items.length} ITEMS</span></div>{items.length === 0 ? <div className="empty-stock">Add weighed products to start the customer ticket.</div> : items.map((item, i) => <div className="ticket-item" key={`${item.name}-${i}`}><div><strong>{item.name}</strong><small>{kg(item.weight)} × {money(item.price)}</small></div><b>{money(item.weight * item.price)}</b></div>)}<footer className="ticket-total"><span>TICKET TOTAL</span><strong>{money(total)}</strong></footer><button className="primary-action" disabled={!items.length}>Reserve & send to POS <span>→</span></button></section></div></div>;
-}
 
 type ButcherOrder = { id:number;orderNumber:string;customerName:string;customerContact:string;requestedTime:string;notes:string;status:string;total:number;source:string;destination:string;createdAt:string;updatedAt:string };
 type ButcherOrderItem = { id:number;orderId:number;productId:number;productName:string;quantity:number;unit:string;unitPrice:number;lineTotal:number };

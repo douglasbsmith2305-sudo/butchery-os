@@ -11,6 +11,7 @@ export const products = sqliteTable("products", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   sku: text("sku").notNull().unique(),
   barcode: text("barcode"),
+  scalePlu: text("scale_plu"),
   name: text("name").notNull(),
   department: text("department").notNull(),
   unit: text("unit").notNull().default("each"),

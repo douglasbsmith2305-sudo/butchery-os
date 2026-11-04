@@ -52,7 +52,7 @@ async function tillSummary(session:TillSession) {
 
 export async function GET() {
   await ensureSchema();
-  let session=await activeTill(); const sessionCount=await env.DB.prepare("SELECT COUNT(*) AS count FROM till_sessions").first<{count:number}>(); if(!session&&Number(sessionCount?.count??0)===0)session=await createTill(0);
+  const session=await activeTill();
   const [products, accounts, sales, movements, sessions] = await Promise.all([
     env.DB.prepare("SELECT id, sku, barcode, name, department, unit, cost_price AS costPrice, selling_price AS sellingPrice, quantity FROM products WHERE active=1 AND quantity > 0 AND department<>'Cost of goods' ORDER BY name LIMIT 1000").all(),
     env.DB.prepare("SELECT id, account_number AS accountNumber, name, credit_limit AS creditLimit, balance, voucher_balance AS voucherBalance, status FROM customer_accounts WHERE status='ACTIVE' ORDER BY account_number").all(),

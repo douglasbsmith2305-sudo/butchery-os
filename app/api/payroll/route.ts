@@ -17,15 +17,7 @@ async function ensureSchema() {
     env.DB.prepare("CREATE TABLE IF NOT EXISTS commission_entries (id INTEGER PRIMARY KEY AUTOINCREMENT, sale_id INTEGER, sale_item_id INTEGER, staff_id INTEGER NOT NULL, product_id INTEGER NOT NULL, product_name TEXT NOT NULL, quantity REAL NOT NULL, gross_amount REAL NOT NULL, net_ex_vat REAL NOT NULL, rate_percent REAL NOT NULL, commission_amount REAL NOT NULL, entry_type TEXT NOT NULL DEFAULT 'EARNED', reference TEXT NOT NULL, created_at TEXT NOT NULL, FOREIGN KEY(staff_id) REFERENCES commission_staff(id))"),
     env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_payroll_runs_period_employee ON payroll_runs(pay_period,employee_id)"),
   ]);
-  const now=new Date().toISOString();
-  await env.DB.batch([
-    env.DB.prepare("INSERT OR IGNORE INTO payroll_employees (employee_number,full_name,id_number,job_title,age_band,base_salary,meat_benefit,benefit_balance,housing_deduction,pension_deduction,medical_deduction,other_taxable_benefits,other_deductions,account_number,created_at) VALUES ('EMP-001','Naledi Mokoena','9001010000000','Butchery Manager','UNDER_65',18500,500,0,1800,0,0,0,0,'STAFF-001',?)").bind(now),
-    env.DB.prepare("INSERT OR IGNORE INTO payroll_employees (employee_number,full_name,id_number,job_title,age_band,base_salary,meat_benefit,benefit_balance,housing_deduction,pension_deduction,medical_deduction,other_taxable_benefits,other_deductions,account_number,created_at) VALUES ('EMP-002','Johan Botha','8506140000000','Senior Butcher','UNDER_65',16200,500,0,1250,450,0,0,0,'STAFF-002',?)").bind(now),
-    env.DB.prepare("INSERT OR IGNORE INTO payroll_employees (employee_number,full_name,id_number,job_title,age_band,base_salary,meat_benefit,benefit_balance,housing_deduction,pension_deduction,medical_deduction,other_taxable_benefits,other_deductions,account_number,created_at) VALUES ('EMP-003','Thandi Ndlovu','9302200000000','Cashier','UNDER_65',9800,500,0,0,0,0,0,0,'STAFF-003',?)").bind(now),
-    env.DB.prepare("INSERT OR IGNORE INTO customer_accounts (account_number,name,credit_limit,balance,payment_terms_days,status) VALUES ('STAFF-001','Naledi Mokoena · Staff Account',5000,0,30,'ACTIVE')"),
-    env.DB.prepare("INSERT OR IGNORE INTO customer_accounts (account_number,name,credit_limit,balance,payment_terms_days,status) VALUES ('STAFF-002','Johan Botha · Staff Account',5000,0,30,'ACTIVE')"),
-    env.DB.prepare("INSERT OR IGNORE INTO customer_accounts (account_number,name,credit_limit,balance,payment_terms_days,status) VALUES ('STAFF-003','Thandi Ndlovu · Staff Account',5000,0,30,'ACTIVE')"),
-  ]);
+
 }
 
 function annualTax(income:number) {

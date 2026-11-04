@@ -14,11 +14,11 @@ async function ensureSchema() {
     env.DB.prepare("ALTER TABLE scale_product_mappings ADD COLUMN IF NOT EXISTS tare_kg DOUBLE PRECISION NOT NULL DEFAULT 0"),
     env.DB.prepare("ALTER TABLE scale_product_mappings ADD COLUMN IF NOT EXISTS shelf_life_days INTEGER NOT NULL DEFAULT 4"),
     env.DB.prepare("ALTER TABLE scale_product_mappings ADD COLUMN IF NOT EXISTS packed_on INTEGER NOT NULL DEFAULT 1"),
+    env.DB.prepare("ALTER TABLE products ADD COLUMN IF NOT EXISTS scale_plu TEXT"),
     env.DB.prepare("ALTER TABLE products ADD COLUMN IF NOT EXISTS active INTEGER NOT NULL DEFAULT 1"),
     env.DB.prepare("CREATE TABLE IF NOT EXISTS commission_staff (id INTEGER PRIMARY KEY AUTOINCREMENT, employee_id INTEGER NOT NULL UNIQUE, staff_code TEXT NOT NULL UNIQUE, custom_rate_percent REAL, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)"),
   ]);
-  const now=new Date().toISOString();
-  await env.DB.prepare("INSERT OR IGNORE INTO scale_devices (name,brand,connector_type,location,endpoint,database_table,active,last_sync_status,created_at) VALUES ('Front Counter Scale 1','DIGI / Teraoka','MYSQL_BRIDGE','Butcher counter','','plu_master',1,'NEVER',?)").bind(now).run();
+
 }
 
 const productSelect="SELECT m.id,m.device_id AS deviceId,m.product_id AS productId,m.plu,m.barcode_prefix AS barcodePrefix,m.label_name AS labelName,m.barcode_mode AS barcodeMode,m.label_format AS labelFormat,m.tare_kg AS tareKg,m.shelf_life_days AS shelfLifeDays,m.packed_on AS packedOn,m.enabled,m.last_synced_price AS lastSyncedPrice,p.sku,p.barcode,p.name,p.department,p.unit,p.selling_price AS sellingPrice FROM scale_product_mappings m JOIN products p ON p.id=m.product_id";
@@ -27,11 +27,11 @@ async function ensureMappings(deviceId:number) {
   const now=new Date().toISOString();
   await env.DB.prepare(`
     INSERT INTO scale_product_mappings (device_id,product_id,plu,barcode_prefix,label_name,enabled,updated_at)
-    SELECT ?,p.id,CAST(1000+p.id AS TEXT),'20',SUBSTR(p.name,1,30),1,?
+    SELECT ?,p.id,COALESCE(NULLIF(p.scale_plu,''),CAST(1000+p.id AS TEXT)),'20',SUBSTR(p.name,1,30),1,?
     FROM products p
     WHERE p.active=1 AND p.department<>'Cost of goods' AND LOWER(p.unit)='kg'
       AND NOT EXISTS (SELECT 1 FROM scale_product_mappings current WHERE current.device_id=? AND current.product_id=p.id)
-      AND NOT EXISTS (SELECT 1 FROM scale_product_mappings occupied WHERE occupied.device_id=? AND occupied.plu=CAST(1000+p.id AS TEXT))
+      AND NOT EXISTS (SELECT 1 FROM scale_product_mappings occupied WHERE occupied.device_id=? AND occupied.plu=COALESCE(NULLIF(p.scale_plu,''),CAST(1000+p.id AS TEXT)))
   `).bind(deviceId,now,deviceId,deviceId).run();
   const products=await env.DB.prepare("SELECT COUNT(*) AS count FROM products WHERE active=1 AND department<>'Cost of goods' AND LOWER(unit)='kg'").first<{count:number}>();
   const staff=await env.DB.prepare("SELECT COUNT(*) AS count FROM commission_staff WHERE active=1").first<{count:number}>();

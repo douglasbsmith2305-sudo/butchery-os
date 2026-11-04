@@ -1,4 +1,28 @@
-# vinext-starter
+# Butchery OS
+
+## Clean real-data start — 4 November 2026
+
+Normal API requests no longer seed example employees, suppliers, accounts, invoices,
+scale devices or tills. A cashier explicitly opens the till with its actual float.
+Manager overview, cooler inventory and batch tracking read saved database records.
+The imported stock list and departments retain their balances, prices and PLUs.
+Empty carcass definitions remain as automatic-receiving configuration, not demo stock.
+
+`drizzle/0020_product_scale_plu.sql` stores imported PLUs independently of a scale
+device so that new scale connections retain original product codes.
+
+The one-off `scripts/production-clean-start.mjs` is **not** an installation seed or
+routine reset. It targets the explicitly audited November cleanup, requires a private
+snapshot, checks the exact protected 1,136-product cohort and departments, and aborts
+if recent operational records would be removed. Recovery manifests are stored outside
+the repository under `~/.codex/backups/butchery-os/`. Never publish backup contents.
+
+Verify seed-free startup using `node --env-file=.env.local tests/clean-start-integration.mjs`.
+The test uses an isolated schema with its own sequence defaults, not live user rows.
+This clean-data milestone is not a security or accounting-compliance certification;
+authentication and role enforcement remain separate work before unrestricted use.
+
+## Original starter documentation
 
 A clean full-stack starter running on
 [vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and

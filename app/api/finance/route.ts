@@ -12,31 +12,7 @@ async function ensureFinanceSchema() {
     db.prepare("CREATE TABLE IF NOT EXISTS customer_purchases (id INTEGER PRIMARY KEY AUTOINCREMENT, account_id INTEGER NOT NULL, invoice_number TEXT NOT NULL UNIQUE, purchase_date TEXT NOT NULL, total REAL NOT NULL, balance REAL NOT NULL, status TEXT NOT NULL DEFAULT 'OPEN', FOREIGN KEY(account_id) REFERENCES customer_accounts(id))"),
     db.prepare("CREATE TABLE IF NOT EXISTS customer_purchase_items (id INTEGER PRIMARY KEY AUTOINCREMENT, purchase_id INTEGER NOT NULL, product_name TEXT NOT NULL, quantity REAL NOT NULL, unit TEXT NOT NULL, unit_price REAL NOT NULL, line_total REAL NOT NULL, FOREIGN KEY(purchase_id) REFERENCES customer_purchases(id))"),
   ]);
-  await db.batch([
-    db.prepare("INSERT OR IGNORE INTO suppliers (name, payment_terms_days, contact, active) VALUES ('Karoo Prime Meats', 7, 'accounts@karoo.example', 1)"),
-    db.prepare("INSERT OR IGNORE INTO suppliers (name, payment_terms_days, contact, active) VALUES ('Highveld Beef Co.', 14, '', 1)"),
-    db.prepare("INSERT OR IGNORE INTO suppliers (name, payment_terms_days, contact, active) VALUES ('Lowveld Livestock', 30, '', 1)"),
-  ]);
-  const supplier = await db.prepare("SELECT id FROM suppliers WHERE name = 'Karoo Prime Meats'").first<{ id: number }>();
-  if (supplier) await db.prepare("INSERT OR IGNORE INTO supplier_invoices (supplier_id, invoice_number, delivery_date, due_date, amount, balance, status, created_at) VALUES (?, 'KPM-68142', '2026-08-07', '2026-08-13', 66240, 66240, 'OPEN', '2026-08-07T07:42:00.000Z')").bind(supplier.id).run();
-  await db.batch([
-    db.prepare("INSERT OR IGNORE INTO customer_accounts (account_number, name, credit_limit, balance, payment_terms_days, status) VALUES ('ACC-1001', 'Mokoena Family Store', 25000, 6842.55, 30, 'ACTIVE')"),
-    db.prepare("INSERT OR IGNORE INTO customer_accounts (account_number, name, credit_limit, balance, payment_terms_days, status) VALUES ('ACC-1002', 'Thabo Nkosi', 10000, 2147.90, 30, 'ACTIVE')"),
-    db.prepare("INSERT OR IGNORE INTO customer_accounts (account_number, name, credit_limit, balance, payment_terms_days, status) VALUES ('ACC-1003', 'Die Plaaskombuis', 40000, 12784.20, 14, 'ACTIVE')"),
-  ]);
-  const account = await db.prepare("SELECT id FROM customer_accounts WHERE account_number='ACC-1001'").first<{ id: number }>();
-  if (account) {
-    await db.batch([
-      db.prepare("INSERT OR IGNORE INTO customer_purchases (account_id, invoice_number, purchase_date, total, balance, status) VALUES (?, 'INV-240812-1842', '2026-08-12', 3274.65, 3274.65, 'OPEN')").bind(account.id),
-      db.prepare("INSERT OR IGNORE INTO customer_purchases (account_id, invoice_number, purchase_date, total, balance, status) VALUES (?, 'INV-240805-1631', '2026-08-05', 3567.90, 3567.90, 'OPEN')").bind(account.id),
-    ]);
-    const purchase = await db.prepare("SELECT id FROM customer_purchases WHERE invoice_number='INV-240812-1842'").first<{ id: number }>();
-    if (purchase) await db.batch([
-      db.prepare("INSERT OR IGNORE INTO customer_purchase_items (id, purchase_id, product_name, quantity, unit, unit_price, line_total) VALUES (10001, ?, 'Bees Rump', 8.4, 'kg', 169.99, 1427.92)").bind(purchase.id),
-      db.prepare("INSERT OR IGNORE INTO customer_purchase_items (id, purchase_id, product_name, quantity, unit, unit_price, line_total) VALUES (10002, ?, 'Hoender Heel', 12, 'each', 89.99, 1079.88)").bind(purchase.id),
-      db.prepare("INSERT OR IGNORE INTO customer_purchase_items (id, purchase_id, product_name, quantity, unit, unit_price, line_total) VALUES (10003, ?, 'Droëwors', 3.2, 'kg', 239.64, 766.85)").bind(purchase.id),
-    ]);
-  }
+
 }
 
 export async function GET() {
