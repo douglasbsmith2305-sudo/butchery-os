@@ -55,6 +55,9 @@ try {
   assert.equal(response.status, 200);
   const product = (await get("/api/stock")).products.find(p => p.sku === "4567");
   assert.equal(product.plu, "4567"); assert.equal(product.quantity, 2);
+  const scanned = await get("/api/scales?barcode=2004567004000");
+  assert.equal(scanned.product.id, product.id);
+  assert.equal(scanned.total, 4); assert.equal(scanned.quantity, .2);
   console.log("PASS: repeated fresh API loads keep staff, suppliers, accounts, sales, tills and batches empty; all 12 departments and zero-stock block profiles remain; PLUs persist without any scale device.");
 } finally {
   if (server) { server.kill("SIGTERM"); await new Promise(resolve => { server.once("exit", resolve); setTimeout(resolve, 4000); }); }

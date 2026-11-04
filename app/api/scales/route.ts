@@ -47,7 +47,19 @@ function expandedItems(mappings:Record<string,unknown>[],staff:CommissionStaff[]
 export async function GET(request:Request) {
   await ensureSchema(); const url=new URL(request.url); const deviceId=Number(url.searchParams.get("device")); const format=url.searchParams.get("format");
   const scanned=url.searchParams.get("barcode")?.replace(/\D/g,"");
-  if(scanned){const [rows,staffRows]=await Promise.all([env.DB.prepare(`${productSelect} WHERE p.active=1 AND p.department<>'Cost of goods' AND m.enabled=1`).all<Record<string,unknown>>(),env.DB.prepare("SELECT c.id,c.staff_code AS staffCode,e.full_name AS fullName,e.employee_number AS employeeNumber FROM commission_staff c JOIN payroll_employees e ON e.id=c.employee_id WHERE c.active=1 ORDER BY CAST(c.staff_code AS INTEGER)").all<CommissionStaff>()]);for(const item of expandedItems(rows.results,staffRows.results)){const decoded=decodeWeightedBarcode(scanned,{barcodePrefix:String(item.barcodePrefix),plu:String(item.plu),barcodeMode:String(item.barcodeMode),sellingPrice:Number(item.sellingPrice)});if(decoded){const stock=await env.DB.prepare("SELECT quantity FROM products WHERE id=? AND active=1").bind(item.productId).first<{quantity:number}>();return Response.json({ok:true,product:{id:item.productId,name:item.name,unit:item.unit,sellingPrice:item.sellingPrice,quantityAvailable:Number(stock?.quantity??0)},staff:item.commissionStaffId?{id:item.commissionStaffId,staffCode:item.staffCode,fullName:item.staffName}:null,...decoded,barcode:scanned});}}return Response.json({error:"Weighted scale barcode not recognised"},{status:404});}
+  if(scanned){
+    const [rows,storedProducts,staffRows]=await Promise.all([
+      env.DB.prepare(`${productSelect} WHERE p.active=1 AND p.department<>'Cost of goods' AND m.enabled=1`).all<Record<string,unknown>>(),
+      // Stock-import labels use prefix 20 with an encoded price. Explicit device mappings take priority.
+      env.DB.prepare("SELECT p.id AS productId,p.scale_plu AS plu,'20' AS barcodePrefix,'PRICE' AS barcodeMode,p.name,p.unit,p.selling_price AS sellingPrice FROM products p WHERE p.active=1 AND p.department<>'Cost of goods' AND LOWER(p.unit)='kg' AND p.scale_plu IS NOT NULL AND NOT EXISTS (SELECT 1 FROM scale_product_mappings m WHERE m.product_id=p.id)").all<Record<string,unknown>>(),
+      env.DB.prepare("SELECT c.id,c.staff_code AS staffCode,e.full_name AS fullName,e.employee_number AS employeeNumber FROM commission_staff c JOIN payroll_employees e ON e.id=c.employee_id WHERE c.active=1 ORDER BY CAST(c.staff_code AS INTEGER)").all<CommissionStaff>(),
+    ]);
+    for(const item of expandedItems([...rows.results,...storedProducts.results],staffRows.results)){
+      const decoded=decodeWeightedBarcode(scanned,{barcodePrefix:String(item.barcodePrefix),plu:String(item.plu),barcodeMode:String(item.barcodeMode),sellingPrice:Number(item.sellingPrice)});
+      if(decoded){const stock=await env.DB.prepare("SELECT quantity FROM products WHERE id=? AND active=1").bind(item.productId).first<{quantity:number}>();return Response.json({ok:true,product:{id:item.productId,name:item.name,unit:item.unit,sellingPrice:item.sellingPrice,quantityAvailable:Number(stock?.quantity??0)},staff:item.commissionStaffId?{id:item.commissionStaffId,staffCode:item.staffCode,fullName:item.staffName}:null,...decoded,barcode:scanned});}
+    }
+    return Response.json({error:"Weighted scale barcode not recognised"},{status:404});
+  }
   if(deviceId)await ensureMappings(deviceId);
   if(deviceId&&(format==="csv"||format==="json")){
     const device=await env.DB.prepare("SELECT id,name,brand,connector_type AS connectorType,location,endpoint,database_table AS databaseTable,last_sync_at AS lastSyncAt,last_sync_status AS lastSyncStatus FROM scale_devices WHERE id=? AND active=1").bind(deviceId).first<Record<string,unknown>>();
