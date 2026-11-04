@@ -121,3 +121,9 @@ html.dark-theme .bulk-stock-toolbar button{background:#152621;color:#8ce0b0;bord
 html.dark-theme .bulk-stock-toolbar button.danger{background:#281416;color:#ff9ca2;border-color:#6b3035}
 html.dark-theme .bulk-stock-toolbar button:disabled{background:#111719;color:#536064;border-color:#2b3538}
 html.dark-theme .product-row.selectable.selected{background:#10231b}
+/* Cost creation and order fulfillment use the same light/dark theme tokens. */
+.cost-add-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:18px 20px;margin:16px 0;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+.cost-add-actions>div{flex:1;min-width:200px}.cost-add-actions p{font-size:12px;margin:6px 0 0;color:var(--muted)}
+.cost-add-actions>button{min-height:44px;padding:10px 18px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);color:var(--text);font-weight:700;cursor:pointer}
+.order-fulfillment{margin:0;padding:0;border:0;grid-column:1/-1}.order-fulfillment legend{margin-bottom:8px;font-size:12px}.order-fulfillment>div{display:flex;gap:8px}.order-fulfillment button{flex:1;min-height:44px;border:1px solid var(--line);border-radius:8px;color:var(--text);background:var(--panel);cursor:pointer}.order-fulfillment button.active{background:#df242b;color:#fff;border-color:#df242b}.order-customer .delivery-address{grid-column:1/-1}.order-delivery-details{padding:12px 0;border-bottom:1px solid var(--line);margin-bottom:12px}.order-delivery-details strong{font-size:12px}.order-delivery-details p{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.5;margin:8px 0}
+@media(max-width:600px){.cost-add-actions>button{flex:1;min-width:150px}}
