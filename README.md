@@ -1,5 +1,21 @@
 # Butchery OS
 
+## Purchase VAT
+
+Receiving costs are entered **excluding VAT**. New receipt lines default to 15%; use
+the 0% selector only when it matches the supplier invoice. Line extensions are rounded
+to cents, then VAT is rounded once on the standard-rated subtotal. Supplier payables
+and calendar invoice amounts include VAT; inventory and material costs exclude it.
+The VAT snapshot and supplier payable are published in one database transaction.
+
+Manager and Back Office → VAT provide a monthly purchase-VAT register by delivery
+date. Older receipts retain null VAT fields and are shown as not captured, never
+automatically re-taxed. This register does not calculate a full VAT201 return or
+confirm input-tax deductibility. Stock-only receipts still retain their VAT breakdown.
+
+Run `node --env-file=.env.local tests/purchase-vat-integration.mjs` for isolated
+verification of receiving, invoice totals, stock costing and the VAT register.
+
 ## Clean real-data start — 4 November 2026
 
 Normal API requests no longer seed example employees, suppliers, accounts, invoices,

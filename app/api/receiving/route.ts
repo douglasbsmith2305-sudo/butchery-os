@@ -1,5 +1,7 @@
 import { env } from "@/lib/db";
 import { BLOCK_TEST_PROFILES, blockTestProfile } from "@/lib/block-tests";
+import { purchaseLineCents, purchaseVatTotals } from "@/lib/purchase-vat";
+import { ensurePurchaseVatSchema } from "@/lib/purchase-vat-schema";
 import { PRODUCTION_DEPARTMENT } from "@/lib/cost-calculations";
 
 async function ensureSchema() {
@@ -29,6 +31,7 @@ async function ensureSchema() {
     db.prepare("CREATE INDEX IF NOT EXISTS stock_receipt_lines_receipt_idx ON stock_receipt_lines(receipt_id)"),
     db.prepare("CREATE INDEX IF NOT EXISTS stock_ledger_product_idx ON stock_ledger_entries(product_id, created_at)"),
   ]);
+  await ensurePurchaseVatSchema();
   const now = new Date().toISOString();
   await db.batch(BLOCK_TEST_PROFILES.flatMap(profile => [
     db.prepare("INSERT INTO products (sku,barcode,name,department,unit,cost_price,selling_price,quantity,imported_at,block_test_profile_code,active) VALUES (?,NULL,?,?, 'kg',0,0,0,?,?,1) ON CONFLICT(sku) DO UPDATE SET name=excluded.name,department=excluded.department,unit='kg',block_test_profile_code=excluded.block_test_profile_code,active=1").bind(profile.inputSku, profile.name, profile.department, now, profile.code),
@@ -42,14 +45,14 @@ export async function GET() {
   const [products, suppliers, receipts, lines, allocations] = await Promise.all([
     env.DB.prepare("SELECT id, sku, barcode, name, department, unit, cost_price AS costPrice, selling_price AS sellingPrice, quantity, block_test_profile_code AS blockTestProfileCode FROM products WHERE active=1 ORDER BY CASE WHEN block_test_profile_code IS NULL THEN 1 ELSE 0 END,name LIMIT 5000").all(),
     env.DB.prepare("SELECT id, name, payment_terms_days AS paymentTermsDays, contact FROM suppliers WHERE active=1 ORDER BY name").all(),
-    env.DB.prepare("SELECT id, receipt_number AS receiptNumber, supplier_name AS supplierName, invoice_number AS invoiceNumber, delivery_date AS deliveryDate, total_cost AS totalCost, created_at AS createdAt FROM stock_receipts ORDER BY id DESC LIMIT 50").all(),
-    env.DB.prepare("SELECT id, receipt_id AS receiptId, product_name AS productName, department, quantity, unit, cost_price AS costPrice, line_total AS lineTotal FROM stock_receipt_lines WHERE receipt_id IN (SELECT id FROM stock_receipts ORDER BY id DESC LIMIT 50) ORDER BY id").all(),
+    env.DB.prepare("SELECT id, receipt_number AS receiptNumber, supplier_name AS supplierName, invoice_number AS invoiceNumber, delivery_date AS deliveryDate, total_cost AS totalCost, subtotal_cents AS subtotalCents, vat_cents AS vatCents, invoice_total_cents AS invoiceTotalCents, purchase_vat_rate AS vatRate, created_at AS createdAt FROM stock_receipts ORDER BY id DESC LIMIT 50").all(),
+    env.DB.prepare("SELECT id, receipt_id AS receiptId, product_name AS productName, department, quantity, unit, cost_price AS costPrice, line_total AS lineTotal, purchase_vat_percent AS vatPercent FROM stock_receipt_lines WHERE receipt_id IN (SELECT id FROM stock_receipts ORDER BY id DESC LIMIT 50) ORDER BY id").all(),
     env.DB.prepare("SELECT a.id,a.receipt_id AS receiptId,a.profile_code AS profileCode,a.baseline_percent AS baselinePercent,a.expected_quantity AS expectedQuantity,a.low_quantity AS lowQuantity,a.high_quantity AS highQuantity,p.name AS outputName FROM block_test_allocations a JOIN products p ON p.id=a.output_product_id WHERE a.receipt_id IN (SELECT id FROM stock_receipts ORDER BY id DESC LIMIT 50) ORDER BY a.id").all(),
   ]);
   return Response.json({ products: products.results, suppliers: suppliers.results, receipts: receipts.results, lines: lines.results, allocations: allocations.results, blockProfiles: BLOCK_TEST_PROFILES });
 }
 
-type ReceiptLine = { productId?: number; quantity?: number; costPrice?: number };
+type ReceiptLine = { productId?: number; quantity?: number; costPrice?: number; vatPercent?: number };
 type ReceiptPayload = {
   action?: "create_supplier";
   supplierName?: string;
@@ -111,7 +114,7 @@ export async function POST(request: Request) {
     products.push(product);
   }
 
-  const normalizedLines = [] as Array<ProductRow & { quantityReceived: number; receivedCostPrice: number; lineTotal: number }>;
+  const normalizedLines = [] as Array<ProductRow & { quantityReceived: number; receivedCostPrice: number; lineTotal: number; vatPercent: number }>;
   for (const line of suppliedLines) {
     const product = products.find(item => item.id === Number(line.productId))!;
     const quantity = Number(line.quantity);
@@ -119,9 +122,16 @@ export async function POST(request: Request) {
     if (!Number.isFinite(quantity) || quantity <= 0) return Response.json({ error: `Enter a valid quantity for ${product.name}.` }, { status: 400 });
     if (!Number.isFinite(receivedCostPrice) || receivedCostPrice <= 0) return Response.json({ error: `Enter the supplier cost per ${product.unit} for ${product.name}.` }, { status: 400 });
     if (product.unit.toLowerCase() !== "kg" && !Number.isInteger(quantity)) return Response.json({ error: `${product.name} is received in ${product.unit}; enter a whole unit quantity.` }, { status: 400 });
-    normalizedLines.push({ ...product, quantityReceived: quantity, receivedCostPrice, lineTotal: quantity * receivedCostPrice });
+    const vatPercent = line.vatPercent ?? 15;
+    if (vatPercent !== 0 && vatPercent !== 15) return Response.json({ error: "Choose 15% or 0% purchase VAT." }, { status: 400 });
+    let lineTotal: number;
+    try { lineTotal = purchaseLineCents(quantity, receivedCostPrice) / 100; } catch { return Response.json({ error: "Invalid invoice amount." }, { status: 400 }); }
+    normalizedLines.push({ ...product, quantityReceived: quantity, receivedCostPrice, lineTotal, vatPercent });
   }
-  const totalCost = normalizedLines.reduce((sum, line) => sum + line.lineTotal, 0);
+  let vatTotals: ReturnType<typeof purchaseVatTotals>;
+  try { vatTotals = purchaseVatTotals(normalizedLines.map(line => ({ quantity: line.quantityReceived, costPrice: line.receivedCostPrice, vatPercent: line.vatPercent }))); } catch { return Response.json({ error: "Invalid invoice total." }, { status: 400 }); }
+  const totalCost = vatTotals.subtotalCents / 100;
+  const invoiceTotal = vatTotals.invoiceTotalCents / 100;
   const now = new Date().toISOString();
   const receiptNumber = `REC-${deliveryDate.replaceAll("-", "").slice(2)}-${Date.now().toString().slice(-5)}`;
 
@@ -138,7 +148,7 @@ export async function POST(request: Request) {
       const profile = blockTestProfile(line.blockTestProfileCode);
       if (profile) {
         await env.DB.batch([
-          env.DB.prepare("INSERT INTO stock_receipt_lines (receipt_id, product_id, product_name, department, quantity, unit, cost_price, line_total, created_at) VALUES (?, ?, ?, ?, ?, 'kg', ?, ?, ?)").bind(receiptId, line.id, line.name, line.department, line.quantityReceived, line.receivedCostPrice, line.lineTotal, now),
+          env.DB.prepare("INSERT INTO stock_receipt_lines (receipt_id, product_id, product_name, department, quantity, unit, cost_price, line_total, purchase_vat_percent, created_at) VALUES (?, ?, ?, ?, ?, 'kg', ?, ?, ?, ?)").bind(receiptId, line.id, line.name, line.department, line.quantityReceived, line.receivedCostPrice, line.lineTotal, line.vatPercent, now),
           env.DB.prepare("INSERT INTO stock_ledger_entries (reference, product_id, product_name, quantity, unit, movement_type, direction, source, reason, created_at) VALUES (?, ?, ?, ?, 'kg', 'SUPPLIER_RECEIPT', 'IN', ?, ?, ?)").bind(receiptNumber, line.id, line.name, line.quantityReceived, supplier.name, `Supplier invoice ${invoiceNumber}`, now),
           env.DB.prepare("INSERT INTO stock_ledger_entries (reference, product_id, product_name, quantity, unit, movement_type, direction, source, reason, created_at) VALUES (?, ?, ?, ?, 'kg', 'AUTO_BLOCK_INPUT', 'OUT', ?, ?, ?)").bind(receiptNumber, line.id, line.name, line.quantityReceived, "Automatic block test", `${profile.name} converted at baseline yield`, now),
         ]);
@@ -175,7 +185,7 @@ export async function POST(request: Request) {
       const margin = Math.min(90, Math.max(0, line.targetMarginPercent || 30));
       const calculatedPrice = Math.ceil((line.receivedCostPrice / Math.max(.1, 1 - margin / 100)) * 100) / 100;
       const coreStatements = [
-        env.DB.prepare("INSERT INTO stock_receipt_lines (receipt_id, product_id, product_name, department, quantity, unit, cost_price, line_total, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(receiptId, line.id, line.name, line.department, line.quantityReceived, line.unit, line.receivedCostPrice, line.lineTotal, now),
+        env.DB.prepare("INSERT INTO stock_receipt_lines (receipt_id, product_id, product_name, department, quantity, unit, cost_price, line_total, purchase_vat_percent, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(receiptId, line.id, line.name, line.department, line.quantityReceived, line.unit, line.receivedCostPrice, line.lineTotal, line.vatPercent, now),
         env.DB.prepare("UPDATE products SET quantity=quantity+?, cost_price=?, imported_at=? WHERE id=?").bind(line.quantityReceived, weightedCost, now, line.id),
         env.DB.prepare("INSERT INTO stock_ledger_entries (reference, product_id, product_name, quantity, unit, movement_type, direction, source, reason, created_at) VALUES (?, ?, ?, ?, ?, 'SUPPLIER_RECEIPT', 'IN', ?, ?, ?)").bind(receiptNumber, line.id, line.name, line.quantityReceived, line.unit, supplier.name, `Supplier invoice ${invoiceNumber}`, now),
       ];
@@ -203,11 +213,15 @@ export async function POST(request: Request) {
     }
 
     let dueDate: string | null = null;
+    const invoiceStatements=[];
     if (payload.postToAccounts !== false && totalCost > 0) {
       dueDate = inclusiveDueDate(deliveryDate, supplier.paymentTermsDays);
-      await env.DB.prepare("INSERT INTO supplier_invoices (supplier_id, invoice_number, delivery_date, due_date, amount, balance, status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'OPEN', ?)").bind(supplier.id, invoiceNumber, deliveryDate, dueDate, totalCost, totalCost, now).run();
+      invoiceStatements.push(env.DB.prepare("INSERT INTO supplier_invoices (supplier_id, invoice_number, delivery_date, due_date, amount, balance, status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'OPEN', ?)").bind(supplier.id, invoiceNumber, deliveryDate, dueDate, invoiceTotal, invoiceTotal, now));
     }
-    return Response.json({ ok: true, receiptNumber, totalCost, dueDate, priceIncreases, decreaseApprovals });
+    invoiceStatements.push(env.DB.prepare("UPDATE stock_receipts SET subtotal_cents=?,vat_cents=?,invoice_total_cents=?,purchase_vat_rate=? WHERE id=?").bind(vatTotals.subtotalCents,vatTotals.vatCents,vatTotals.invoiceTotalCents,vatTotals.vatRate,receiptId));
+    // Publish the VAT snapshot and gross payable together, only after stock has posted.
+    await env.DB.atomic(invoiceStatements);
+    return Response.json({ ok: true, receiptNumber, totalCost, ...vatTotals, invoiceTotal, dueDate, priceIncreases, decreaseApprovals });
   } catch (error) {
     const message = error instanceof Error ? error.message : "The receipt could not be posted.";
     return Response.json({ error: message }, { status: 400 });
